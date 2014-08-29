@@ -1,0 +1,5 @@
+To build, run following command:
+
+export PATHONPATH=build
+python common/build.py
+make _bin/common/libbase.a
