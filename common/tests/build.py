@@ -13,3 +13,15 @@ cpp_unittest(
   ],
 )
 
+cpp_unittest(
+  name = "threadpool_test",
+  srcs = [
+    "ThreadPoolTest.cpp",
+  ],
+  deps = [
+    "common:libbase.a",
+  ],
+  linkopt = [
+    "-pthread",
+  ],
+)
