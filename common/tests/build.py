@@ -38,3 +38,13 @@ cpp_unittest(
     "-pthread",
   ],
 )
+
+cpp_unittest(
+  name = "range_test",
+  srcs = [
+    "RangeTest.cpp",
+  ],
+  deps = [
+    "common:libbase.a",
+  ],
+)

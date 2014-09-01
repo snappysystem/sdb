@@ -6,6 +6,7 @@ cpp_library(
     "Dir.cpp",
     "ThreadPool.cpp",
     "Event.cpp",
+    "Range.cpp",
     "UnitTest.cpp",
   ],
 )
