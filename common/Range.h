@@ -92,6 +92,27 @@ class basic_range {
       begin(), end(), another.begin(), another.end());
   }
 
+  // remove @nBytes from the beginning of the range
+  void pop_front(int nBytes) {
+    beg_ += nBytes;
+    if (beg_ > end_) {
+      beg_ = end_;
+    }
+  }
+
+  // remove @nBytes from the end of the range
+  void pop_back(int nBytes) {
+    end_ -= nBytes;
+    if (beg_ > end_) {
+      end_ = beg_;
+    }
+  }
+
+  // return a std::string representation
+  std::string toString() const {
+    return std::string(beg_, end_);
+  }
+
  private:
 
   T* beg_;

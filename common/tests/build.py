@@ -48,3 +48,13 @@ cpp_unittest(
     "common:libbase.a",
   ],
 )
+
+cpp_unittest(
+  name = "serializer_test",
+  srcs = [
+    "SerializerTest.cpp",
+  ],
+  deps = [
+    "common:libbase.a",
+  ],
+)
