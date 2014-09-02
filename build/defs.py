@@ -54,7 +54,7 @@ phony:
 	echo 'nothing to build'
 
 clean:
-	find build -name "*.pyc" | xargs -r rm && rm -rf _bin/*
+	find . -name "*.pyc" | xargs -r rm && rm -rf _bin/*
 
 '''
 
