@@ -4,6 +4,7 @@ import os
 import imp
 import sys
 import atexit
+import os.path
 
 
 '''global variables'''
@@ -125,7 +126,9 @@ def output_cc_line(source_name, cflags):
     cfstr = ''
 
   target = make_output_dir(current_relative_dir + '/' + base + '.o')
+
   srcfile = current_relative_dir + '/' + source_name
+  srcheader = current_relative_dir + '/' + base + '.h'
 
   global rules
   if target in rules:
@@ -134,6 +137,11 @@ def output_cc_line(source_name, cflags):
   rules.add(target)
 
   fd.write('\n' + target + ': ' + srcfile)
+
+  #add header file as dependency if it exists
+  if (os.path.isfile(srcheader)):
+    fd.write(' ' + srcheader)
+
   fd.write('\n\t' + 'mkdir -p ' + make_output_dir(current_relative_dir) +
     ' && $(CC) -o ' + target + ' -c $(CFLAGS) ' + cfstr + ' ' +
     srcfile + '\n')
