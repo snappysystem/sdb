@@ -58,3 +58,16 @@ cpp_unittest(
     "common:libbase.a",
   ],
 )
+
+cpp_unittest(
+  name = "sharedmutex_test",
+  srcs = [
+    "SharedMutexTest.cpp",
+  ],
+  deps = [
+    "common:libbase.a",
+  ],
+  linkopt = [
+    "-pthread",
+  ],
+)
