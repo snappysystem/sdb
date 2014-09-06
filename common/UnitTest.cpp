@@ -1,4 +1,5 @@
 #include "common/Logging.h"
+#include "common/ThreadPool.h"
 #include "common/UnitTest.h"
 #include <iostream>
 
@@ -45,9 +46,23 @@ void MakeForkedProcess::operator=(function<void()> cb) {
 
 main() {
   auto& tests = sdb::TestInfo::getList();
+  auto tp = new sdb::ThreadPool(4);
+
+  mutex mt;
+
   for (auto& t : tests) {
-    cerr << "Running " << t.name << endl;
-    t.fn();
+    tp->submit([&t, &mt]() {
+      {
+        lock_guard<mutex> l(mt);
+        cerr << "Running " << t.name << endl;
+      }
+
+      t.fn();
+    });
   }
+
+  tp->drain();
+  delete tp;
+
   cerr << "Finished " << tests.size() << " tests." << endl;
 }

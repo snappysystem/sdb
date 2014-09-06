@@ -18,17 +18,9 @@ ThreadPool::~ThreadPool() {
 bool ThreadPool::start() {
   lock_guard<mutex> g(mt_);
   for (int i = 0; i < numWorkers_; ++i) {
-    pthread_t tid;
     freed_.emplace_back(new Worker(this));
-    pthread_create(
-      &tid,
-      nullptr,
-      [](void* p) -> void* {
-        Worker* w = (Worker*)p;
-        w->run();
-        return nullptr;
-      },
-      (void*)freed_.back().get());
+    auto worker = freed_.back().get();
+    new thread([worker]() { worker->run(); });
   }
 
   return true;
@@ -55,40 +47,38 @@ void ThreadPool::submit(function<void()>&& c) {
 }
 
 void ThreadPool::drain() {
-  while (true) {
-    unique_lock<mutex> l(mt_);
-    while (!running_.empty()) {
-      cond_.wait(l);
-    }
-
-    return;
+  unique_lock<mutex> l(mt_);
+  while (!running_.empty()) {
+    cond_.wait(l);
   }
 }
 
 void ThreadPool::setFree(Worker* w) {
-  lock_guard<mutex> l(mt_);
+  {
+    lock_guard<mutex> l(mt_);
 
-  if (!pendings_.empty()) {
-    w->hasFunctor = true;
-    w->cb = move(pendings_.front());
-    pendings_.pop_front();
-    return;
-  }
-
-  auto it = running_.begin();
-  for (; it != running_.end(); ++it) {
-    if (it->get() == w) {
-      break;
+    if (!pendings_.empty()) {
+      w->hasFunctor = true;
+      w->cb = move(pendings_.front());
+      pendings_.pop_front();
+      return;
     }
-  }
 
-  if (it == running_.end()) {
-    LOG(FATAL) << "Fails to find worker to free!";
-  }
+    auto it = running_.begin();
+    for (; it != running_.end(); ++it) {
+      if (it->get() == w) {
+        break;
+      }
+    }
 
-  auto p = std::move(*it);
-  running_.erase(it);
-  freed_.push_back(std::move(p));
+    if (it == running_.end()) {
+      LOG(FATAL) << "Fails to find worker to free!";
+    }
+
+    auto p = std::move(*it);
+    running_.erase(it);
+    freed_.push_back(std::move(p));
+  }
 
   cond_.notify_one();
 }

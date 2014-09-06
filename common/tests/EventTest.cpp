@@ -96,7 +96,7 @@ TEST(Event, testManyEventManagerSchedule) {
       auto& f = futs[i];
       ASSERT_EQ(f.get(), i);
       auto ts = nowInMs();
-      ASSERT_LT(abs(ts - startTime - i * 20), 2);
+      ASSERT_LT(abs(ts - startTime - i * 20), 5);
     }
       
     eventMgr->drain();

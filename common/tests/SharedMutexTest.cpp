@@ -19,49 +19,53 @@ TEST(SharedMutex, testReadLocks) {
 }
 
 TEST(SharedMutex, testSharedAndExclusiveLock) {
-  SharedMutex mt;
+  FORK {
+    SharedMutex mt;
 
-  int val = 0;
-  auto tp = new ThreadPool(2);
+    int val = 0;
+    auto tp = new ThreadPool(2);
 
-  mt.lock();
+    mt.lock();
 
-  for (int i = 0; i < 10; ++i) {
-    tp->submit([&mt, &val]() {
-      mt.lock_shared();
-      ++val;
-      mt.unlock_shared();
-    });
-  }
+    for (int i = 0; i < 10; ++i) {
+      tp->submit([&mt, &val]() {
+        mt.lock_shared();
+        ++val;
+        mt.unlock_shared();
+      });
+    }
 
-  ASSERT_EQ(val, 0);
-  mt.unlock();
+    ASSERT_EQ(val, 0);
+    mt.unlock();
 
-  tp->drain();
-  delete tp;
+    tp->drain();
+    delete tp;
+  };
 }
 
 TEST(SharedMutex, testExclusiveLock) {
-  SharedMutex mt;
+  FORK {
+    SharedMutex mt;
 
-  int val = 0;
-  auto tp = new ThreadPool(2);
+    int val = 0;
+    auto tp = new ThreadPool(2);
 
-  mt.lock();
+    mt.lock();
 
-  for (int i = 0; i < 10; ++i) {
-    tp->submit([&mt, &val]() {
-      mt.lock();
-      ++val;
-      mt.unlock();
-    });
-  }
+    for (int i = 0; i < 10; ++i) {
+      tp->submit([&mt, &val]() {
+        mt.lock();
+        ++val;
+        mt.unlock();
+      });
+    }
 
-  ASSERT_EQ(val, 0);
-  mt.unlock();
+    ASSERT_EQ(val, 0);
+    mt.unlock();
 
-  tp->drain();
+    tp->drain();
 
-  ASSERT_EQ(val, 10);
-  delete tp;
+    ASSERT_EQ(val, 10);
+    delete tp;
+  };
 }
