@@ -41,8 +41,8 @@ def output_global_symbols():
 
 
 AR=/usr/bin/ar crT  
-CC=/usr/bin/g++
-CFLAGS=-I. -std=c++0x -g\
+CC=/usr/bin/g++-4.9
+CFLAGS=-I. -std=c++1y -g\
  -Wall\
  -Wno-sign-compare\
  -Wno-return-type\
