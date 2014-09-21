@@ -400,3 +400,66 @@ TEST(Serializer, testProcessUnorderedMap) {
     ASSERT_EQ(range.size(), 0);
   }
 }
+
+TEST(Serializer, testProcessTuple) {
+  tuple<int, int, string> val(3, 4, "hello");
+  tuple<int, int, string> ret;
+
+  {
+    IoRange ioRange;
+    Serializer<tuple<int, int, string>>().append(ioRange, val);
+
+    auto range = ioRange.getRange();
+
+    auto success = Deserializer<tuple<int, int, string>>().parse(range, ret);
+    ASSERT_TRUE(success);
+
+    ASSERT_TRUE(val == ret);
+    ASSERT_EQ(range.size(), 0);
+  }
+
+  auto rsize = Serializer<tuple<int, int, string>>().sizeOf(val);
+  ASSERT_EQ(rsize, sizeof(int) * 2 + 4 + 5);
+
+  {
+    IoRange ioRange;
+    Serializer<tuple<int, int, string>>().append(ioRange, val);
+    auto range = ioRange.getRange();
+    auto success = Deserializer<tuple<int, int, string>>().skip(range);
+   
+    ASSERT_TRUE(success);
+    ASSERT_EQ(range.size(), 0);
+  }
+}
+#if 0
+TEST(Serializer, testProcessTuple) {
+  tuple<int, int, string> val(3, 4, "hello");
+  tuple<int, int, string> ret;
+
+  {
+    IoRange ioRange;
+    Serializer<tuple<int, int, string>>().append(ioRange, val);
+
+    auto range = ioRange.getRange();
+
+    auto success = Deserializer<tuple<int, int, string>>().parse(range, ret);
+    ASSERT_TRUE(success);
+
+    ASSERT_TRUE(val == ret);
+    ASSERT_EQ(range.size(), 0);
+  }
+
+  auto rsize = Serializer<tuple<int, int, string>>().sizeOf(val);
+  ASSERT_EQ(rsize, sizeof(int) * 2 + 4 + 5);
+
+  {
+    IoRange ioRange;
+    Serializer<tuple<int, int, string>>().append(ioRange, val);
+    auto range = ioRange.getRange();
+    auto success = Deserializer<tuple<int, int, string>>().skip(range);
+   
+    ASSERT_TRUE(success);
+    ASSERT_EQ(range.size(), 0);
+  }
+}
+#endif

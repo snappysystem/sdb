@@ -7,6 +7,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <tuple>
 #include <unordered_map>
 #include <cstdint>
 
@@ -390,6 +391,67 @@ template <class F, class T> struct Deserializer<std::pair<F, T>> {
   }
 };
 
+// Helper class for Deserializer<tuple<...>>
+template <int N, class... TypeArgs>
+struct DeserializerHelper {
+
+  static const int idx = std::tuple_size<std::tuple<TypeArgs...>>::value - N;
+
+  typedef std::tuple<TypeArgs...> tuple_type;
+  typedef typename std::tuple_element<idx, tuple_type>::type element_type;
+
+  bool parse(Range& range, std::tuple<TypeArgs...>& val) const {
+    if (!Deserializer<element_type>().parse(range, std::get<idx>(val))) {
+      return false;
+    }
+
+    return DeserializerHelper<N-1, TypeArgs...>().parse(range, val);
+  }
+
+  bool skip(Range& range) const {
+    if (!Deserializer<element_type>().skip(range)) {
+      return false;
+    }
+
+    return DeserializerHelper<N-1, TypeArgs...>().skip(range);
+  }
+};
+
+template <class... TypeArgs>
+struct DeserializerHelper<1, TypeArgs...> {
+
+  static const int idx = std::tuple_size<std::tuple<TypeArgs...>>::value - 1;
+
+  typedef std::tuple<TypeArgs...> tuple_type;
+  typedef typename std::tuple_element<idx, tuple_type>::type element_type;
+
+  bool parse(Range& range, std::tuple<TypeArgs...>& val) const {
+    return Deserializer<element_type>().parse(range, std::get<idx>(val));
+  }
+
+  bool skip(Range& range) const {
+    return Deserializer<element_type>().skip(range);
+  }
+};
+
+template <class... TypeArgs>
+struct Deserializer<std::tuple<TypeArgs...>> {
+  bool parse(Range& range, std::tuple<TypeArgs...>& val) const {
+    typedef std::tuple<TypeArgs...> tuple_type;
+    typedef std::tuple_size<tuple_type> tuple_size_type;
+    typedef DeserializerHelper<tuple_size_type::value, TypeArgs...> helper_t;
+    return helper_t().parse(range, val);
+  }
+
+  bool skip(Range& range) const {
+    typedef std::tuple<TypeArgs...> tuple_type;
+    typedef std::tuple_size<tuple_type> tuple_size_type;
+    typedef DeserializerHelper<tuple_size_type::value, TypeArgs...> helper_t;
+    return helper_t().skip(range);
+  }
+};
+
+
 template <class T> struct Deserializer<std::vector<T>> {
   bool parse(Range& range, std::vector<T>& val) const {
     int32_t num = 0;
@@ -707,6 +769,61 @@ template <class T> struct Serializer<std::vector<T>> {
     }
 
     return total;
+  }
+};
+
+template <int N, class... TypeArgs>
+struct SerializerHelper {
+
+  typedef std::tuple<TypeArgs...> tuple_type;
+  typedef typename std::tuple_size<tuple_type> tuple_size_type;
+
+  static const int idx = tuple_size_type::value - N;
+
+  typedef typename std::tuple_element<idx, tuple_type>::type element_type;
+
+  void append(IoRange& ioRange, const tuple_type& val) const {
+    Serializer<element_type>().append(ioRange, std::get<idx>(val));
+    SerializerHelper<N-1, TypeArgs...>().append(ioRange, val);
+  }
+
+  int sizeOf(const tuple_type& val) const {
+    int total = Serializer<element_type>().sizeOf(std::get<idx>(val));
+    total += SerializerHelper<N-1, TypeArgs...>().sizeOf(val);
+    return total;
+  }
+};
+
+template <class... TypeArgs>
+struct SerializerHelper<1, TypeArgs...> {
+
+  typedef std::tuple<TypeArgs...> tuple_type;
+  typedef typename std::tuple_size<tuple_type> tuple_size_type;
+
+  static const int idx = tuple_size_type::value - 1;
+
+  typedef typename std::tuple_element<idx, tuple_type>::type element_type;
+
+  void append(IoRange& ioRange, const tuple_type& val) const {
+    Serializer<element_type>().append(ioRange, std::get<idx>(val));
+  }
+
+  int sizeOf(const tuple_type& val) const {
+    return Serializer<element_type>().sizeOf(std::get<idx>(val));
+  }
+};
+
+template <class... TypeArgs>
+struct Serializer<std::tuple<TypeArgs...>> {
+
+  static const int tupleSize = std::tuple_size<std::tuple<TypeArgs...>>::value;
+
+  void append(IoRange& range, const std::tuple<TypeArgs...>& val) const {
+    SerializerHelper<tupleSize, TypeArgs...>().append(range, val);
+  }
+
+  int sizeOf(const std::tuple<TypeArgs...>& val) const {
+    return SerializerHelper<tupleSize, TypeArgs...>().sizeOf(val);
   }
 };
 
