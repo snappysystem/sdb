@@ -1,13 +1,15 @@
-#include "common/SharedMutex.h"
 #include "common/ThreadPool.h"
 #include "common/Logging.h"
 #include "common/UnitTest.h"
+
+#include <mutex>
+#include <shared_mutex>
 
 using namespace sdb;
 using namespace std;
 
 TEST(SharedMutex, testReadLocks) {
-  SharedMutex mt;
+  shared_timed_mutex mt;
 
   mt.lock_shared();
   mt.lock_shared();
@@ -20,7 +22,7 @@ TEST(SharedMutex, testReadLocks) {
 
 TEST(SharedMutex, testSharedAndExclusiveLock) {
   FORK {
-    SharedMutex mt;
+    shared_timed_mutex mt;
 
     int val = 0;
     auto tp = new ThreadPool(2);
@@ -45,7 +47,7 @@ TEST(SharedMutex, testSharedAndExclusiveLock) {
 
 TEST(SharedMutex, testExclusiveLock) {
   FORK {
-    SharedMutex mt;
+    shared_timed_mutex mt;
 
     int val = 0;
     auto tp = new ThreadPool(2);

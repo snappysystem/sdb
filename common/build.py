@@ -7,7 +7,6 @@ cpp_library(
     "ThreadPool.cpp",
     "Event.cpp",
     "Range.cpp",
-    "SharedMutex.cpp",
     "UnitTest.cpp",
   ],
 )
