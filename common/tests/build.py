@@ -71,3 +71,13 @@ cpp_unittest(
     "-pthread",
   ],
 )
+
+cpp_unittest(
+  name = "fastalloc_test",
+  srcs = [
+    "FastAllocTest.cpp",
+  ],
+  deps = [
+    "common:libbase.a",
+  ],
+)
