@@ -2,13 +2,12 @@ package bigmap
 
 import "testing"
 
-
 func TestRandomGeneratorReturn0s(t *testing.T) {
 	gen := makeRandomGenerator()
 	count := 0
 
 	for i := 0; i < 32; i++ {
-    res := gen.get()
+		res := gen.get()
 		if res == 0 {
 			count++
 		}

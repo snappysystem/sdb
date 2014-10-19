@@ -2,15 +2,14 @@ package bigmap
 
 import "testing"
 
-
 func TestAllocateNode(t *testing.T) {
 	alloc := skiplistNodeAllocator{}
-  alloc.init()
-  defer alloc.deallocateAll()
+	alloc.init()
+	defer alloc.deallocateAll()
 
 	for i := 0; i < 1000; i++ {
 		l := alloc.newLeaf()
-		if (l == nil) {
+		if l == nil {
 			t.Error("fails to get a new leaf skiplistNode!")
 		}
 	}
@@ -18,21 +17,21 @@ func TestAllocateNode(t *testing.T) {
 
 func TestTraverseLeaf(t *testing.T) {
 	alloc := skiplistNodeAllocator{}
-  alloc.init()
-  defer alloc.deallocateAll()
+	alloc.init()
+	defer alloc.deallocateAll()
 
 	a := alloc.newLeaf()
 	b := alloc.newLeaf()
 	c := alloc.newLeaf()
 
-  a.next = b
-  b.next = c
+	a.next = b
+	b.next = c
 
-  var n skiplistNode
+	var n skiplistNode
 	n = a
 	y := n.getNext().getNext()
 
-	if (c != y.(*skiplistLeafNode)) {
+	if c != y.(*skiplistLeafNode) {
 		t.Error("Fails to traverse as a skiplistNode")
 	}
 }
