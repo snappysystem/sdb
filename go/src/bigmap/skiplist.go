@@ -4,7 +4,6 @@ import (
 	"bytes"
 )
 
-
 type BytesSkiplistOrder struct {
 }
 
@@ -33,7 +32,7 @@ func MakeSkiplist(args ...Order) *Skiplist {
 		panic("args is either 0 or 1")
 	}
 
-	ret.levels = make([]skiplistNode, maxLevel + 1)
+	ret.levels = make([]skiplistNode, maxLevel+1)
 	ret.allocator.init()
 	ret.gen = makeRandomGenerator()
 	ret.numNodes = 0
@@ -100,6 +99,10 @@ func (a *Skiplist) Get(key []byte) (value []byte, ok bool) {
 	return
 }
 
+func (a *Skiplist) NewIterator(opt *ReadOptions) Iterator {
+	return makeSkiplistIter(a)
+}
+
 func (a *Skiplist) trace(key []byte) (ret []skiplistNode, found bool) {
 	numLevels := len(a.levels)
 	ret = make([]skiplistNode, numLevels)
@@ -108,8 +111,8 @@ func (a *Skiplist) trace(key []byte) (ret []skiplistNode, found bool) {
 	for cur, i := a.levels[numLevels-1], numLevels-1; i >= 0; {
 		if cur == nil {
 			i--
-			if (i >= 0) {
-			  cur = a.levels[i]
+			if i >= 0 {
+				cur = a.levels[i]
 			} else {
 				break
 			}
@@ -147,4 +150,53 @@ func (a *Skiplist) trace(key []byte) (ret []skiplistNode, found bool) {
 	}
 
 	return
+}
+
+// Iterator class for skiplist
+type skiplistIter struct {
+	slist *Skiplist
+	cur   skiplistNode
+}
+
+func makeSkiplistIter(s *Skiplist) *skiplistIter {
+	ret := &skiplistIter{}
+	ret.slist = s
+	return ret
+}
+
+func (a *skiplistIter) Valid() bool {
+	return a.cur != nil
+}
+
+func (a *skiplistIter) SeekToFirst() {
+	a.cur = a.slist.levels[0]
+}
+
+func (a *skiplistIter) SeekToLast() {
+}
+
+func (a *skiplistIter) Seek(key []byte) {
+	traces, match := a.slist.trace(key)
+	if match {
+		a.cur = traces[0]
+	} else if traces[0] != nil {
+		a.cur = traces[0].getNext()
+	}
+}
+
+func (a *skiplistIter) Next() {
+	a.cur = a.cur.getNext()
+}
+
+func (a *skiplistIter) Prev() {
+	panic("Not implemented yet")
+}
+
+func (a *skiplistIter) Key() []byte {
+	return a.cur.getKey()
+}
+
+func (a *skiplistIter) Value() []byte {
+	leaf := a.cur.(*skiplistLeafNode)
+	return leaf.value
 }

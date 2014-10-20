@@ -1,28 +1,29 @@
 package bigmap
 
 import (
-	"testing"
 	"bytes"
-	"math/rand"
-	"time"
 	"fmt"
+	"math/rand"
+	"sort"
+	"testing"
+	"time"
 )
 
-func TestSkiplistPutGetLess(t *testing.T) {
+func TestSkiplistPutGetSome(t *testing.T) {
 	slist := MakeSkiplist()
 	data := [...]string{"hello", "world", "go", "language"}
 
-	for _,s := range(data) {
+	for _, s := range data {
 		arr := []byte(s)
-		_,ok := slist.Put(arr, arr)
+		_, ok := slist.Put(arr, arr)
 		if !ok {
 			t.Error("Fails to put ", s)
 		}
 	}
 
-	for _,s := range(data) {
+	for _, s := range data {
 		arr := []byte(s)
-		val,ok := slist.Get(arr)
+		val, ok := slist.Get(arr)
 		if !ok || bytes.Compare(arr, val) != 0 {
 			t.Error("Fails to find key ", s)
 		}
@@ -50,8 +51,8 @@ func TestSkiplistPutGetMore(t *testing.T) {
 		slist.Put(key, key)
 	}
 
-	for i,k := range(data) {
-		val,ok := slist.Get(k)
+	for i, k := range data {
+		val, ok := slist.Get(k)
 		if !ok || bytes.Compare(val, k) != 0 {
 			t.Error("Fails to find key ", i, " ", string(k))
 		}
@@ -92,3 +93,86 @@ func TestSkiplistPutPerf(t *testing.T) {
 	fmt.Println("ski uses ", skiplistTime/numElements, " nanoseconds per op")
 }
 
+func TestSkiplistScanForwardSome(t *testing.T) {
+	data := [...]string{"go", "hello", "world", "yellow"}
+	slist := MakeSkiplist()
+
+	for _, s := range data {
+		bs := []byte(s)
+		slist.Put(bs, bs)
+	}
+
+	ro := &ReadOptions{}
+	iter := slist.NewIterator(ro)
+	iter.SeekToFirst()
+
+	for _, s := range data {
+		if !iter.Valid() {
+			t.Error("Not valid at ", s)
+		}
+		if bytes.Compare(iter.Key(), []byte(s)) != 0 {
+			t.Error("Got string ", string(iter.Key()))
+		}
+		iter.Next()
+	}
+}
+
+// struct to sort a slice of byte slices
+type ByteSliceSorter struct {
+	bytesList [][]byte
+}
+
+func MakeSortInterface(x [][]byte) sort.Interface {
+	return &ByteSliceSorter{x}
+}
+
+func (a *ByteSliceSorter) Len() int {
+	return len(a.bytesList)
+}
+
+func (a *ByteSliceSorter) Less(i, j int) bool {
+	return bytes.Compare(a.bytesList[i], a.bytesList[j]) < 0
+}
+
+func (a *ByteSliceSorter) Swap(i, j int) {
+	tmp := a.bytesList[i]
+	a.bytesList[i] = a.bytesList[j]
+	a.bytesList[j] = tmp
+}
+
+func TestSkiplistScanForwardMore(t *testing.T) {
+	const numElements = 1000
+
+	slist := MakeSkiplist()
+	data := make([][]byte, 0, numElements)
+
+	for i := 0; i < numElements; i++ {
+		key := genRandomBytes()
+		data = append(data, key)
+		slist.Put(key, key)
+	}
+
+	sort.Sort(MakeSortInterface(data))
+
+	ro := &ReadOptions{}
+	iter := slist.NewIterator(ro)
+	iter.SeekToFirst()
+
+	prev := make([]byte, 0)
+	for _, bs := range data {
+		if bytes.Compare(prev, bs) == 0 {
+			continue
+		}
+
+		if !iter.Valid() {
+			t.Error("Premature end of iteration")
+		}
+
+		if bytes.Compare(iter.Key(), bs) != 0 {
+			t.Error("Fails to compare ", string(iter.Key()), " ", string(bs))
+		}
+
+		prev = bs
+		iter.Next()
+	}
+}

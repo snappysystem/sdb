@@ -1,11 +1,10 @@
 package bigmap
 
-
 type Iterator interface {
 	Valid() bool
 	SeekToFirst()
 	SeekToLast()
-	Seek()
+	Seek(key []byte)
 	Next()
 	Prev()
 	Key() []byte
