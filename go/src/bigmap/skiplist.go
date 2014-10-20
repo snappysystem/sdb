@@ -103,6 +103,9 @@ func (a *Skiplist) NewIterator(opt *ReadOptions) Iterator {
 	return makeSkiplistIter(a)
 }
 
+// Find out nodes in all levels that point a key either before @key or
+// exactly point to @key. Return true if @key is in the skip list,
+// otherwise false
 func (a *Skiplist) trace(key []byte) (ret []skiplistNode, found bool) {
 	numLevels := len(a.levels)
 	ret = make([]skiplistNode, numLevels)
@@ -152,6 +155,51 @@ func (a *Skiplist) trace(key []byte) (ret []skiplistNode, found bool) {
 	return
 }
 
+func (a *Skiplist) traceBackward(key []byte) []skiplistNode {
+	numLevels := len(a.levels)
+	ret := make([]skiplistNode, numLevels)
+	var prev skiplistNode
+
+	for cur, i := a.levels[numLevels-1], numLevels-1; i >= 0; {
+		if cur == nil {
+			i--
+			if i >= 0 {
+				cur = a.levels[i]
+			} else {
+				break
+			}
+			continue
+		}
+
+		switch a.order.Compare(cur.getKey(), key) {
+		case -1:
+			prev = cur
+			cur = cur.getNext()
+			if cur == nil {
+				ret[i] = prev
+				i--
+				cur = prev.getChild()
+				prev = nil
+			}
+		case 0:
+			fallthrough
+		case 1:
+			ret[i] = prev
+			i--
+			if prev != nil {
+				cur = prev.getChild()
+				prev = nil
+			} else if i >= 0 {
+				cur = a.levels[i]
+			}
+		default:
+			panic("Invaid comparison value")
+		}
+	}
+
+	return ret
+}
+
 // Iterator class for skiplist
 type skiplistIter struct {
 	slist *Skiplist
@@ -189,7 +237,8 @@ func (a *skiplistIter) Next() {
 }
 
 func (a *skiplistIter) Prev() {
-	panic("Not implemented yet")
+	key := a.cur.getKey()
+	a.cur = a.slist.traceBackward(key)[0]
 }
 
 func (a *skiplistIter) Key() []byte {

@@ -117,6 +117,30 @@ func TestSkiplistScanForwardSome(t *testing.T) {
 	}
 }
 
+func TestSkiplistScanBackwardSome(t *testing.T) {
+	data := [...]string{"yellow", "world", "hello", "go"}
+	slist := MakeSkiplist()
+
+	for _, s := range data {
+		bs := []byte(s)
+		slist.Put(bs, bs)
+	}
+
+	ro := &ReadOptions{}
+	iter := slist.NewIterator(ro)
+	iter.Seek([]byte(data[0]))
+
+	for _, s := range data {
+		if !iter.Valid() {
+			t.Error("Not valid at ", s)
+		}
+		if bytes.Compare(iter.Key(), []byte(s)) != 0 {
+			t.Error("Got string ", string(iter.Key()))
+		}
+		iter.Prev()
+	}
+}
+
 // struct to sort a slice of byte slices
 type ByteSliceSorter struct {
 	bytesList [][]byte
@@ -174,5 +198,43 @@ func TestSkiplistScanForwardMore(t *testing.T) {
 
 		prev = bs
 		iter.Next()
+	}
+}
+
+func TestSkiplistScanBackwardMore(t *testing.T) {
+	const numElements = 1000
+
+	slist := MakeSkiplist()
+	data := make([][]byte, 0, numElements)
+
+	for i := 0; i < numElements; i++ {
+		key := genRandomBytes()
+		data = append(data, key)
+		slist.Put(key, key)
+	}
+
+	sort.Sort(MakeSortInterface(data))
+
+	ro := &ReadOptions{}
+	iter := slist.NewIterator(ro)
+	iter.Seek(data[len(data)-1])
+
+	prev := make([]byte, 0)
+	for i := len(data) - 1; i >= 0; i-- {
+		bs := data[i]
+		if bytes.Compare(prev, bs) == 0 {
+			continue
+		}
+
+		if !iter.Valid() {
+			t.Error("Premature end of iteration")
+		}
+
+		if bytes.Compare(iter.Key(), bs) != 0 {
+			t.Error("Fails to compare ", string(iter.Key()), " ", string(bs))
+		}
+
+		prev = bs
+		iter.Prev()
 	}
 }
