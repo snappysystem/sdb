@@ -1,12 +1,9 @@
 package bigmap
 
-import "bytes"
+import (
+	"bytes"
+)
 
-// compare two binaries, return -1 if a is less than b, 0 if a is the same
-// as b, and 1 if a is greater than b
-type SkiplistOrder interface {
-	Compare(a []byte, b []byte) int
-}
 
 type BytesSkiplistOrder struct {
 }
@@ -19,12 +16,12 @@ type Skiplist struct {
 	levels    []skiplistNode
 	allocator skiplistNodeAllocator
 	gen       *randomGenerator
-	order     SkiplistOrder
+	order     Order
 	numNodes  int
 }
 
 // Create a new skiplist
-func MakeSkiplist(args ...SkiplistOrder) *Skiplist {
+func MakeSkiplist(args ...Order) *Skiplist {
 	ret := Skiplist{}
 
 	switch len(args) {
@@ -36,7 +33,7 @@ func MakeSkiplist(args ...SkiplistOrder) *Skiplist {
 		panic("args is either 0 or 1")
 	}
 
-	ret.levels = make([]skiplistNode, 0, 16)
+	ret.levels = make([]skiplistNode, maxLevel + 1)
 	ret.allocator.init()
 	ret.gen = makeRandomGenerator()
 	ret.numNodes = 0
@@ -75,11 +72,7 @@ func (a *Skiplist) Put(key []byte, val []byte) (old []byte, ok bool) {
 			prevList[i].setNext(newNode)
 		} else {
 			newNode.setNext(a.levels[i])
-			if a.levels[i] != nil {
-				a.levels[i].setNext(newNode)
-			} else {
-				a.levels[i] = newNode
-			}
+			a.levels[i] = newNode
 		}
 
 		if child != nil {
@@ -115,7 +108,11 @@ func (a *Skiplist) trace(key []byte) (ret []skiplistNode, found bool) {
 	for cur, i := a.levels[numLevels-1], numLevels-1; i >= 0; {
 		if cur == nil {
 			i--
-			cur = a.levels[i]
+			if (i >= 0) {
+			  cur = a.levels[i]
+			} else {
+				break
+			}
 			continue
 		}
 
@@ -141,7 +138,7 @@ func (a *Skiplist) trace(key []byte) (ret []skiplistNode, found bool) {
 			if prev != nil {
 				cur = prev.getChild()
 				prev = nil
-			} else {
+			} else if i >= 0 {
 				cur = a.levels[i]
 			}
 		default:
