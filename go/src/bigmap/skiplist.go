@@ -200,6 +200,47 @@ func (a *Skiplist) traceBackward(key []byte) []skiplistNode {
 	return ret
 }
 
+func (a *Skiplist) locateLast() skiplistNode {
+	numLevels := len(a.levels)
+	ret := make([]skiplistNode, numLevels)
+	var prev skiplistNode
+
+	for cur, i := a.levels[numLevels-1], numLevels-1; i >= 0; {
+		if cur == nil {
+			i--
+			if i >= 0 {
+				cur = a.levels[i]
+			} else {
+				break
+			}
+			continue
+		}
+
+		switch {
+		case cur.getNext() != nil:
+			prev = cur
+			cur = cur.getNext()
+			if cur == nil {
+				ret[i] = prev
+				i--
+				cur = prev.getChild()
+				prev = nil
+			}
+		default:
+			ret[i] = cur
+			i--
+			if prev != nil {
+				cur = prev.getChild()
+				prev = nil
+			} else if i >= 0 {
+				cur = a.levels[i]
+			}
+		}
+	}
+
+	return ret[0]
+}
+
 // Iterator class for skiplist
 type skiplistIter struct {
 	slist *Skiplist
@@ -221,6 +262,7 @@ func (a *skiplistIter) SeekToFirst() {
 }
 
 func (a *skiplistIter) SeekToLast() {
+	a.cur = a.slist.locateLast()
 }
 
 func (a *skiplistIter) Seek(key []byte) {

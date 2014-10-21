@@ -115,6 +115,10 @@ func TestSkiplistScanForwardSome(t *testing.T) {
 		}
 		iter.Next()
 	}
+
+	if iter.Valid() {
+		t.Error("iter should not be valid at this time")
+	}
 }
 
 func TestSkiplistScanBackwardSome(t *testing.T) {
@@ -128,7 +132,7 @@ func TestSkiplistScanBackwardSome(t *testing.T) {
 
 	ro := &ReadOptions{}
 	iter := slist.NewIterator(ro)
-	iter.Seek([]byte(data[0]))
+	iter.SeekToLast()
 
 	for _, s := range data {
 		if !iter.Valid() {
@@ -138,6 +142,10 @@ func TestSkiplistScanBackwardSome(t *testing.T) {
 			t.Error("Got string ", string(iter.Key()))
 		}
 		iter.Prev()
+	}
+
+	if iter.Valid() {
+		t.Error("iter should not be valid at this time")
 	}
 }
 
@@ -199,6 +207,10 @@ func TestSkiplistScanForwardMore(t *testing.T) {
 		prev = bs
 		iter.Next()
 	}
+
+	if iter.Valid() {
+		t.Error("iter should not be valid at this time")
+	}
 }
 
 func TestSkiplistScanBackwardMore(t *testing.T) {
@@ -217,7 +229,7 @@ func TestSkiplistScanBackwardMore(t *testing.T) {
 
 	ro := &ReadOptions{}
 	iter := slist.NewIterator(ro)
-	iter.Seek(data[len(data)-1])
+	iter.SeekToLast()
 
 	prev := make([]byte, 0)
 	for i := len(data) - 1; i >= 0; i-- {
@@ -236,5 +248,9 @@ func TestSkiplistScanBackwardMore(t *testing.T) {
 
 		prev = bs
 		iter.Prev()
+	}
+
+	if iter.Valid() {
+		t.Error("iter should not be valid at this time")
 	}
 }
