@@ -1,6 +1,9 @@
 package bigmap
 
-import "unsafe"
+import (
+	"sync/atomic"
+	"unsafe"
+)
 
 // general interface for a skiplistNode in skip list
 type skiplistNode interface {
@@ -16,7 +19,7 @@ type skiplistNode interface {
 type skiplistLeafNode struct {
 	key   []byte
 	value []byte
-	next  skiplistNode
+	next  *skiplistLeafNode
 }
 
 func (a *skiplistLeafNode) getKey() []byte {
@@ -24,7 +27,11 @@ func (a *skiplistLeafNode) getKey() []byte {
 }
 
 func (a *skiplistLeafNode) getNext() skiplistNode {
-	return a.next
+	if a.next != nil {
+		return a.next
+	} else {
+		return nil
+	}
 }
 
 func (a *skiplistLeafNode) getChild() skiplistNode {
@@ -36,7 +43,12 @@ func (a *skiplistLeafNode) setKey(key []byte) {
 }
 
 func (a *skiplistLeafNode) setNext(next skiplistNode) {
-	a.next = next
+	var val *skiplistLeafNode
+	if next != nil {
+		val = next.(*skiplistLeafNode)
+	}
+	dst := (*unsafe.Pointer)(unsafe.Pointer(&a.next))
+	atomic.StorePointer(dst, unsafe.Pointer(val))
 }
 
 func (a *skiplistLeafNode) setChild(child skiplistNode) {
@@ -46,7 +58,7 @@ func (a *skiplistLeafNode) setChild(child skiplistNode) {
 // additional links in a skip list skiplistNode is represented by a skiplistPointerNode
 type skiplistPointerNode struct {
 	key   []byte
-	next  skiplistNode
+	next  *skiplistPointerNode
 	child skiplistNode
 }
 
@@ -55,7 +67,11 @@ func (a *skiplistPointerNode) getKey() []byte {
 }
 
 func (a *skiplistPointerNode) getNext() skiplistNode {
-	return a.next
+	if a.next != nil {
+		return a.next
+	} else {
+		return nil
+	}
 }
 
 func (a *skiplistPointerNode) getChild() skiplistNode {
@@ -67,7 +83,12 @@ func (a *skiplistPointerNode) setKey(key []byte) {
 }
 
 func (a *skiplistPointerNode) setNext(next skiplistNode) {
-	a.next = next
+	var val *skiplistPointerNode
+	if next != nil {
+		val = next.(*skiplistPointerNode)
+	}
+	dst := (*unsafe.Pointer)(unsafe.Pointer(&a.next))
+	atomic.StorePointer(dst, unsafe.Pointer(val))
 }
 
 func (a *skiplistPointerNode) setChild(child skiplistNode) {

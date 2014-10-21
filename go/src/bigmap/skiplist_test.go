@@ -60,7 +60,7 @@ func TestSkiplistPutGetMore(t *testing.T) {
 }
 
 func TestSkiplistPutPerf(t *testing.T) {
-	const numElements = 500
+	const numElements = 2000
 
 	data := make(map[string][]byte)
 	slist := MakeSkiplist()
