@@ -103,19 +103,21 @@ type skiplistNodeAllocator struct {
 }
 
 // init memory pool, must be called after the allocator is created
-func (a *skiplistNodeAllocator) init(alloc ...Allocator) {
+func makeNodeAllocator(bytesAlloc ...Allocator) *skiplistNodeAllocator {
 	x1 := skiplistLeafNode{}
 	x2 := skiplistPointerNode{}
-	a.leafSize = int(unsafe.Sizeof(x1))
-	a.pointerSize = int(unsafe.Sizeof(x2))
-	switch len(alloc) {
+	ret := &skiplistNodeAllocator{}
+	ret.leafSize = int(unsafe.Sizeof(x1))
+	ret.pointerSize = int(unsafe.Sizeof(x2))
+	switch len(bytesAlloc) {
 		case 0:
-			a.pool = MakeMemPoolAllocator()
+			ret.pool = MakeMemPoolAllocator()
 		case 1:
-			a.pool = alloc[0]
+			ret.pool = bytesAlloc[0]
 		default:
 			panic("Can only take 0 or 1 parameter")
 	}
+	return ret
 }
 
 // allocate a new leaf
