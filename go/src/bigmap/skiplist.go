@@ -20,20 +20,24 @@ type Skiplist struct {
 }
 
 // Create a new skiplist
-func MakeSkiplist(args ...Order) *Skiplist {
+func MakeSkiplist(args ...interface{}) *Skiplist {
 	ret := Skiplist{}
 
 	switch len(args) {
 	case 0:
 		ret.order = &BytesSkiplistOrder{}
+		ret.allocator.init()
 	case 1:
-		ret.order = args[0]
+		ret.order = args[0].(Order)
+		ret.allocator.init()
+	case 2:
+		ret.order = args[0].(Order)
+		ret.allocator.init(args[1].(Allocator))
 	default:
 		panic("args is either 0 or 1")
 	}
 
 	ret.levels = make([]skiplistNode, maxLevel+1)
-	ret.allocator.init()
 	ret.gen = makeRandomGenerator()
 	ret.numNodes = 0
 	return &ret

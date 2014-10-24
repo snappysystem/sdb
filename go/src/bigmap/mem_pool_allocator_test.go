@@ -3,25 +3,22 @@ package bigmap
 import "testing"
 
 func TestSingleMemPoolAlloc(t *testing.T) {
-	mp := memPoolAllocator{}
-	mp.init()
-
-	x := mp.allocate(512)
+	mp := MakeMemPoolAllocator()
+	x := mp.Allocate(512)
 	if x == nil {
 		t.Error("Fails to allocate block")
 	}
 }
 
 func TestManyMemPoolAllocDealloc(t *testing.T) {
-	mp := memPoolAllocator{}
-	mp.init()
+	mp := MakeMemPoolAllocator()
 
 	for i := 0; i < 2048; i++ {
-		x := mp.allocate(16 * 1024 * 1024)
+		x := mp.Allocate(16 * 1024 * 1024)
 		if x == nil {
 			t.Error("Fails to allocate block")
 		}
 	}
 
-	mp.deallocateAll()
+	mp.DeallocateAll()
 }

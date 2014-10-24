@@ -3,8 +3,9 @@ package bigmap
 import "testing"
 
 func TestAllocateNode(t *testing.T) {
+	nativeAlloc := MakeMemPoolAllocator()
 	alloc := skiplistNodeAllocator{}
-	alloc.init()
+	alloc.init(nativeAlloc)
 	defer alloc.deallocateAll()
 
 	for i := 0; i < 1000; i++ {
@@ -16,8 +17,9 @@ func TestAllocateNode(t *testing.T) {
 }
 
 func TestTraverseLeaf(t *testing.T) {
+	nativeAlloc := MakeMemPoolAllocator()
 	alloc := skiplistNodeAllocator{}
-	alloc.init()
+	alloc.init(nativeAlloc)
 	defer alloc.deallocateAll()
 
 	a := alloc.newLeaf()

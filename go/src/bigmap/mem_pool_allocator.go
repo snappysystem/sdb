@@ -14,23 +14,25 @@ type memPoolAllocator struct {
 // takes 0 or 1 parameters. If there is no parameter, the default
 // block allocation size is used. Otherwise, use the specified
 // value as block allocation size
-func (a *memPoolAllocator) init(bytes ...int) {
+func MakeMemPoolAllocator(bytes ...int) Allocator {
+	ret := &memPoolAllocator{}
 	switch len(bytes) {
 	case 0:
-		a.bytesPerAlloc = kBytesPerAlloc
+		ret.bytesPerAlloc = kBytesPerAlloc
 	case 1:
-		a.bytesPerAlloc = bytes[0]
+		ret.bytesPerAlloc = bytes[0]
 	default:
 		panic("init only takes 0 or 1 parameter!")
 	}
 
-	a.pool = make([][]byte, kNumBlocks)
-	a.current, _ = MmapAlloc(a.bytesPerAlloc)
+	ret.pool = make([][]byte, kNumBlocks)
+	ret.current,_ = MmapAlloc(ret.bytesPerAlloc)
+	return ret
 }
 
 // allocate @size bytes and return the space in the form
 // of a byte slice
-func (a *memPoolAllocator) allocate(size int) []byte {
+func (a *memPoolAllocator) Allocate(size int) []byte {
 	if len(a.current) >= size {
 		ret := a.current[:size]
 		a.current = a.current[size:]
@@ -40,12 +42,12 @@ func (a *memPoolAllocator) allocate(size int) []byte {
 	} else {
 		a.pool = append(a.pool, a.current)
 		a.current, _ = MmapAlloc(a.bytesPerAlloc)
-		return a.allocate(size)
+		return a.Allocate(size)
 	}
 }
 
 // release all memories that has been allocated
-func (a *memPoolAllocator) deallocateAll() {
+func (a *memPoolAllocator) DeallocateAll() {
 	for _, a := range a.pool {
 		MmapDealloc(a)
 	}

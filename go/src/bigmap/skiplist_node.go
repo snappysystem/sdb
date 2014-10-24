@@ -55,7 +55,8 @@ func (a *skiplistLeafNode) setChild(child skiplistNode) {
 	panic("should not set child on leaf node")
 }
 
-// additional links in a skip list skiplistNode is represented by a skiplistPointerNode
+// additional links in a skip list skiplistNode is
+// represented by a skiplistPointerNode
 type skiplistPointerNode struct {
 	key   []byte
 	next  *skiplistPointerNode
@@ -98,31 +99,38 @@ func (a *skiplistPointerNode) setChild(child skiplistNode) {
 type skiplistNodeAllocator struct {
 	leafSize    int
 	pointerSize int
-	pool        memPoolAllocator
+	pool        Allocator
 }
 
 // init memory pool, must be called after the allocator is created
-func (a *skiplistNodeAllocator) init() {
+func (a *skiplistNodeAllocator) init(alloc ...Allocator) {
 	x1 := skiplistLeafNode{}
 	x2 := skiplistPointerNode{}
 	a.leafSize = int(unsafe.Sizeof(x1))
 	a.pointerSize = int(unsafe.Sizeof(x2))
-	a.pool.init()
+	switch len(alloc) {
+		case 0:
+			a.pool = MakeMemPoolAllocator()
+		case 1:
+			a.pool = alloc[0]
+		default:
+			panic("Can only take 0 or 1 parameter")
+	}
 }
 
 // allocate a new leaf
 func (a *skiplistNodeAllocator) newLeaf() *skiplistLeafNode {
-	b := a.pool.allocate(a.leafSize)
+	b := a.pool.Allocate(a.leafSize)
 	return (*skiplistLeafNode)(unsafe.Pointer(&b[0]))
 }
 
 // allocate a new pointer skiplistNode
 func (a *skiplistNodeAllocator) newPointer() *skiplistPointerNode {
-	b := a.pool.allocate(a.pointerSize)
+	b := a.pool.Allocate(a.pointerSize)
 	return (*skiplistPointerNode)(unsafe.Pointer(&b[0]))
 }
 
 // deallocate all skiplistNodes
 func (a *skiplistNodeAllocator) deallocateAll() {
-	a.pool.deallocateAll()
+	a.pool.DeallocateAll()
 }
