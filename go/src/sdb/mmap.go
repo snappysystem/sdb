@@ -1,4 +1,4 @@
-package bigmap
+package sdb
 
 import "syscall"
 

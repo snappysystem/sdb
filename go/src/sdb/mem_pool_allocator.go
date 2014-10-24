@@ -1,4 +1,4 @@
-package bigmap
+package sdb
 
 const (
 	kBytesPerAlloc = 128 * 1024 * 1024

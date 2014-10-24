@@ -1,4 +1,4 @@
-package bigmap
+package sdb
 
 // A class to enumerate all entries in the key value store
 type Iterator interface {
