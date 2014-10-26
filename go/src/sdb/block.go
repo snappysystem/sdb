@@ -35,17 +35,18 @@ type Block struct {
 	lastOffset    uint32
 	restartOffset uint32
 	numKeys       uint32
-	order         Order
 }
 
 type blockIter struct {
 	block *Block
+	order Order
 	idx   int32
 }
 
-func (a *Block) NewIterator() Iterator {
+func (a *Block) NewIterator(o Order) Iterator {
 	ret := &blockIter{}
 	ret.block = a
+	ret.order = o
 	ret.idx = -1
 	return ret
 }
@@ -132,7 +133,7 @@ func (a *blockIter) Seek(mark []byte) {
 				panic("corrupted data")
 			}
 
-			return (b.order.Compare(key, mark) >= 0)
+			return (a.order.Compare(key, mark) >= 0)
 		}))
 }
 
@@ -240,12 +241,12 @@ var modelTailer blockTailer
 // the boundary of the block. Return true if operation succeeds
 func (a *BlockBuilder) Finalize() (ret *Block, ok bool) {
 	// align starting of restart offset to 8 byte boundary
-	restart := a.dataSize
+	restart := a.startOffset + a.dataSize
 	restart = (restart + 7) / 8 * 8
 	pos := restart
 
 	// save all key offsets
-	for off := range a.keys {
+	for _, off := range a.keys {
 		intPtr := (*uint32)(unsafe.Pointer(&a.data[pos]))
 		pos = pos + 4
 		if int(pos) >= len(a.data) {
