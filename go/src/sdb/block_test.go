@@ -50,3 +50,79 @@ func TestCreateAndEnumerateBlock(t *testing.T) {
 		t.Error("iterator pass the end")
 	}
 }
+
+func TestBlockRandomSeek(t *testing.T) {
+	// first build the block
+	data := make([]byte, 4096)
+	builder := MakeBlockBuilder(data, 0)
+
+	for i := 100; i < 105; i++ {
+		s := strconv.Itoa(i)
+		b := []byte(s)
+		builder.Add(b, b)
+	}
+
+	block, ok := builder.Finalize()
+	if !ok {
+		t.Error("Fails to build block")
+	}
+
+	// seek to one entry in the block
+	order := &BytesSkiplistOrder{}
+	iter := block.NewIterator(order)
+	iter.Seek([]byte("103"))
+
+	for i := 103; i < 105; i++ {
+		if !iter.Valid() {
+			t.Error("iter ends prematurely")
+		}
+		s := strconv.Itoa(i)
+		if string(iter.Key()) != s {
+			t.Error("Fails to seek to ", s)
+		}
+
+		iter.Next()
+	}
+
+	if iter.Valid() {
+		t.Error("iter has extra value")
+	}
+}
+
+func TestBlockBackwardSeek(t *testing.T) {
+	// first build the block
+	data := make([]byte, 4096)
+	builder := MakeBlockBuilder(data, 0)
+
+	for i := 100; i < 105; i++ {
+		s := strconv.Itoa(i)
+		b := []byte(s)
+		builder.Add(b, b)
+	}
+
+	block, ok := builder.Finalize()
+	if !ok {
+		t.Error("Fails to build block")
+	}
+
+	// seek to one entry in the block
+	order := &BytesSkiplistOrder{}
+	iter := block.NewIterator(order)
+	iter.Seek([]byte("103"))
+
+	for i := 103; i >= 100; i-- {
+		if !iter.Valid() {
+			t.Error("iter ends prematurely")
+		}
+		s := strconv.Itoa(i)
+		if string(iter.Key()) != s {
+			t.Error("Fails to seek to ", s)
+		}
+
+		iter.Prev()
+	}
+
+	if iter.Valid() {
+		t.Error("iter has extra value")
+	}
+}
