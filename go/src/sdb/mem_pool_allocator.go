@@ -26,7 +26,7 @@ func MakeMemPoolAllocator(bytes ...int) Allocator {
 	}
 
 	ret.pool = make([][]byte, kNumBlocks)
-	ret.current,_ = MmapAlloc(ret.bytesPerAlloc)
+	ret.current, _ = MmapAlloc(ret.bytesPerAlloc)
 	return ret
 }
 

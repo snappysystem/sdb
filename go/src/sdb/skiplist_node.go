@@ -110,12 +110,12 @@ func makeNodeAllocator(bytesAlloc ...Allocator) *skiplistNodeAllocator {
 	ret.leafSize = int(unsafe.Sizeof(x1))
 	ret.pointerSize = int(unsafe.Sizeof(x2))
 	switch len(bytesAlloc) {
-		case 0:
-			ret.pool = MakeMemPoolAllocator()
-		case 1:
-			ret.pool = bytesAlloc[0]
-		default:
-			panic("Can only take 0 or 1 parameter")
+	case 0:
+		ret.pool = MakeMemPoolAllocator()
+	case 1:
+		ret.pool = bytesAlloc[0]
+	default:
+		panic("Can only take 0 or 1 parameter")
 	}
 	return ret
 }
