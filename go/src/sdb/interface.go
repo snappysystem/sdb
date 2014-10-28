@@ -24,3 +24,72 @@ type Allocator interface {
 type Order interface {
 	Compare(a []byte, b []byte) int
 }
+
+// interface to represent the result of an operation
+type Status interface {
+	Ok() bool
+	IsNotFound() bool
+	IsCorruption() bool
+	IsIoError() bool
+	ToString() string
+}
+
+// An interface used by db implementation to access OS
+// functionality. Caller may supply his own version of
+// env when openning a db
+type Env interface {
+	NewSequentialFile(name string) (SequentialFile, Status)
+	NewRandomAccessFile(name string) (RandomAccessFile, Status)
+	NewWritableFil(name string) (WritableFile, Status)
+	FileExists(name string) bool
+	GetChildren(dir string) ([]string, Status)
+	DeleteFile(name string) Status
+	CreateDir(dir string) Status
+	DeleteDir(dir string) Status
+	GetFileSize(name string) (uint64, Status)
+	RenameFile(src string, target string) Status
+}
+
+// define a range [start, limit), note @limit is not included in
+// the range
+type Range struct {
+	start []byte
+	limit []byte
+}
+
+// DB interface
+type DB interface {
+	Put(opt WriteOptions, key, value []byte) Status
+	Delete(opt WriteOptions, key []byte) Status
+	Write(opt WriteOptions, updates WriteBatch) Status
+	Get(opt ReadOptions, key, value []byte) Status
+	NewIterator(opt ReadOptions) Iterator
+	GetSnapshot() Snapshot
+	ReleaseSnapshot(snap Snapshot)
+	GetApproximateSizes(ranges []Range) []uint64
+	CompactRange(start, limit []byte)
+}
+
+type WriteBatch interface {
+	Put(key, value []byte)
+	Delete(key []byte)
+	NewIterator() Iterator
+}
+
+type Snapshot interface {
+}
+
+type SequentialFile interface {
+	Read(n, scratchOffset uint32, scratch []byte) ([]byte, Status)
+	Skip(n uint32) Status
+}
+
+type RandomAccessFile interface {
+	Read(offset uint64, n, scratchOffset uint32, scratch []byte) ([]byte, Status)
+}
+
+type WritableFile interface {
+	Append(data []byte) Status
+	Close() Status
+	Flush() Status
+}
