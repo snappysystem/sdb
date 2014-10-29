@@ -18,7 +18,7 @@ func MakeLocalSequentialFile(name string) SequentialFile {
 	return &localSequentialFile{f, 0}
 }
 
-func (a *localSequentialFile) Read(n uint32, scratch []byte) (ret []byte, s Status) {
+func (a *localSequentialFile) Read(scratch []byte) (ret []byte, s Status) {
 	nreads, err := a.file.ReadAt(scratch, int64(a.pos))
 	if err != nil {
 		s = MakeStatusIoError("fails to read")
@@ -84,4 +84,31 @@ func (a *localWritableFile) Flush() Status {
 	} else {
 		return MakeStatusOk()
 	}
+}
+
+type localRandomAccessFile struct {
+	file *os.File
+}
+
+func MakeLocalRandomAccessFile(name string) RandomAccessFile {
+	f, err := os.Open(name)
+	if err != nil {
+		return nil
+	}
+	return &localRandomAccessFile{f}
+}
+
+func (a *localRandomAccessFile) Read(off int64, scratch []byte) (b []byte, s Status) {
+	nreads, err := a.file.ReadAt(scratch, off)
+	if err != nil {
+		s = MakeStatusIoError("")
+		return
+	}
+	b = scratch[:nreads]
+	s = MakeStatusOk()
+	return
+}
+
+func (a *localRandomAccessFile) Close() {
+	a.file.Close()
 }

@@ -80,13 +80,13 @@ type Snapshot interface {
 }
 
 type SequentialFile interface {
-	Read(n uint32, scratch []byte) ([]byte, Status)
+	Read(scratch []byte) ([]byte, Status)
 	Skip(n uint32) Status
 	Close()
 }
 
 type RandomAccessFile interface {
-	Read(offset uint64, n uint32, scratch []byte) ([]byte, Status)
+	Read(offset int64, scratch []byte) ([]byte, Status)
 	Close()
 }
 
