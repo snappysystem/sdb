@@ -15,12 +15,12 @@ type Skiplist struct {
 	levels    []skiplistNode
 	allocator *skiplistNodeAllocator
 	gen       *randomGenerator
-	order     Order
+	order     Comparator
 	numNodes  int
 }
 
 // Create a new skiplist. It can take up to 2 parameters:
-// First optional parameter (Order): the customized comparator
+// First optional parameter (Comparator): the customized comparator
 // Second optional parameter (Allocator): a customized byte allocator
 func MakeSkiplist(args ...interface{}) *Skiplist {
 	ret := Skiplist{}
@@ -30,10 +30,10 @@ func MakeSkiplist(args ...interface{}) *Skiplist {
 		ret.order = &BytesSkiplistOrder{}
 		ret.allocator = makeNodeAllocator()
 	case 1:
-		ret.order = args[0].(Order)
+		ret.order = args[0].(Comparator)
 		ret.allocator = makeNodeAllocator()
 	case 2:
-		ret.order = args[0].(Order)
+		ret.order = args[0].(Comparator)
 		ret.allocator = makeNodeAllocator(args[1].(Allocator))
 	default:
 		panic("args is either 0 or 1")

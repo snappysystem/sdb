@@ -21,7 +21,7 @@ type Allocator interface {
 
 // compare two binaries, return -1 if a is less than b, 0 if a is the same
 // as b, and 1 if a is greater than b
-type Order interface {
+type Comparator interface {
 	Compare(a []byte, b []byte) int
 }
 
@@ -81,7 +81,7 @@ type Snapshot interface {
 
 type SequentialFile interface {
 	Read(scratch []byte) ([]byte, Status)
-	Skip(n uint32) Status
+	Skip(n int64) Status
 	Close()
 }
 

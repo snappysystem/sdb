@@ -6,7 +6,7 @@ import (
 
 type localSequentialFile struct {
 	file *os.File
-	pos  uint32
+	pos  int64
 }
 
 func MakeLocalSequentialFile(name string) SequentialFile {
@@ -19,18 +19,18 @@ func MakeLocalSequentialFile(name string) SequentialFile {
 }
 
 func (a *localSequentialFile) Read(scratch []byte) (ret []byte, s Status) {
-	nreads, err := a.file.ReadAt(scratch, int64(a.pos))
+	nreads, err := a.file.ReadAt(scratch, a.pos)
 	if err != nil {
 		s = MakeStatusIoError("fails to read")
 	} else {
 		s = MakeStatusOk()
 		ret = scratch[:nreads]
-		a.pos = a.pos + uint32(nreads)
+		a.pos = a.pos + int64(nreads)
 	}
 	return
 }
 
-func (a *localSequentialFile) Skip(n uint32) Status {
+func (a *localSequentialFile) Skip(n int64) Status {
 	a.pos = a.pos + n
 	return MakeStatusOk()
 }
@@ -41,7 +41,7 @@ func (a *localSequentialFile) Close() {
 
 type localWritableFile struct {
 	file *os.File
-	pos  uint32
+	pos  int64
 }
 
 func MakeLocalWritableFile(name string) WritableFile {
@@ -55,15 +55,15 @@ func MakeLocalWritableFile(name string) WritableFile {
 		return nil
 	}
 
-	return &localWritableFile{f, uint32(off)}
+	return &localWritableFile{f, off}
 }
 
 func (a *localWritableFile) Append(data []byte) Status {
-	nwritten, err := a.file.WriteAt(data, int64(a.pos))
+	nwritten, err := a.file.WriteAt(data, a.pos)
 	if err != nil || int(nwritten) != len(data) {
 		return MakeStatusIoError("")
 	} else {
-		a.pos = a.pos + uint32(nwritten)
+		a.pos = a.pos + int64(nwritten)
 		return MakeStatusOk()
 	}
 }

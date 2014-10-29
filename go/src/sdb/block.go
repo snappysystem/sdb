@@ -39,11 +39,11 @@ type Block struct {
 
 type blockIter struct {
 	block *Block
-	order Order
+	order Comparator
 	idx   int32
 }
 
-func (a *Block) NewIterator(o Order) Iterator {
+func (a *Block) NewIterator(o Comparator) Iterator {
 	ret := &blockIter{}
 	ret.block = a
 	ret.order = o
