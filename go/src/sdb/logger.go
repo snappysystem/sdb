@@ -100,11 +100,96 @@ func (w *Writer) AddRecord(record []byte) Status {
 	return MakeStatusOk()
 }
 
+const (
+	ReadStatusOk = iota
+	ReadStatusEOF
+	ReadStatusCorruption
+)
+
 type Reader struct {
-	file     *SequentialFile
+	file     SequentialFile
 	off      int64
 	checksum bool
 }
 
-/*func (r *Reader) ReadRecord(scratch []byte) (ret []byte, ok bool) {
-}*/
+func (r *Reader) ReadRecord(scratch []byte) (ret []byte, status int) {
+	header := [kHeaderSize]byte{}
+	buffer := scratch
+	size := 0
+
+	for firstIter := true; true; firstIter = false {
+		offInBlock := r.off % kBlockSize
+		availInBlock := int(kBlockSize - offInBlock)
+
+		switch {
+		case availInBlock > kHeaderSize:
+			tmp, s := r.file.Read(header[:])
+			switch {
+			case !s.Ok():
+				status = ReadStatusCorruption
+				return
+			case len(tmp) == kHeaderSize:
+				// expected case, do nothing
+			case len(tmp) == 0:
+				status = ReadStatusEOF
+				return
+			default:
+				status = ReadStatusCorruption
+				return
+			}
+
+			p16 := (*uint16)(unsafe.Pointer(&header[5]))
+			totalBytes := int(*p16)
+			size = size + totalBytes
+
+			if totalBytes+kHeaderSize > availInBlock {
+				status = ReadStatusCorruption
+				return
+			}
+
+			tmp, s = r.file.Read(buffer[:totalBytes])
+			if !s.Ok() || len(tmp) != totalBytes {
+				status = ReadStatusCorruption
+				return
+			}
+
+			p32 := (*uint32)(unsafe.Pointer(&header[5]))
+			cksum := crc32.ChecksumIEEE(tmp)
+
+			if cksum != *p32 {
+				status = ReadStatusCorruption
+			}
+
+			switch int(header[4]) {
+			case kFullType:
+				if firstIter {
+					ret, status = tmp, ReadStatusOk
+				} else {
+					status = ReadStatusCorruption
+				}
+				return
+
+			case kLastType:
+				if firstIter {
+					status = ReadStatusCorruption
+				} else {
+					ret, status = scratch[:size], ReadStatusOk
+				}
+				return
+
+			default:
+				// continue reading, do nothing here
+			}
+
+		default:
+			s := r.file.Skip(int64(availInBlock))
+			if !s.Ok() {
+				status = ReadStatusCorruption
+				return
+			}
+		}
+	}
+
+	panic("Should not reach here!")
+	return
+}

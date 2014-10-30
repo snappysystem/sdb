@@ -1,6 +1,7 @@
 package sdb
 
 import (
+	"io"
 	"os"
 )
 
@@ -20,12 +21,15 @@ func MakeLocalSequentialFile(name string) SequentialFile {
 
 func (a *localSequentialFile) Read(scratch []byte) (ret []byte, s Status) {
 	nreads, err := a.file.ReadAt(scratch, a.pos)
-	if err != nil {
-		s = MakeStatusIoError("fails to read")
-	} else {
+	switch {
+	case err == nil:
 		s = MakeStatusOk()
 		ret = scratch[:nreads]
 		a.pos = a.pos + int64(nreads)
+	case err == io.EOF:
+		s = MakeStatusOk()
+	default:
+		s = MakeStatusIoError("fails to read")
 	}
 	return
 }
