@@ -68,6 +68,10 @@ func (a *localWritableFile) Append(data []byte) Status {
 	}
 }
 
+func (a *localWritableFile) Size() int64 {
+	return a.pos
+}
+
 func (a *localWritableFile) Close() Status {
 	err := a.file.Close()
 	if err != nil {

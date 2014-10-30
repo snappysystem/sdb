@@ -92,6 +92,7 @@ type RandomAccessFile interface {
 
 type WritableFile interface {
 	Append(data []byte) Status
+	Size() int64
 	Close() Status
 	Flush() Status
 }
