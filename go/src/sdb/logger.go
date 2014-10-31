@@ -140,15 +140,17 @@ func (r *Reader) ReadRecord(scratch []byte) (ret []byte, status int) {
 
 			p16 := (*uint16)(unsafe.Pointer(&header[5]))
 			totalBytes := int(*p16)
-			size = size + totalBytes
 
-			if totalBytes+kHeaderSize > availInBlock {
+			if totalBytes <= kHeaderSize || totalBytes > availInBlock {
 				status = ReadStatusCorruption
 				return
 			}
 
-			tmp, s = r.file.Read(buffer[:totalBytes])
-			if !s.Ok() || len(tmp) != totalBytes {
+			toRead := totalBytes - kHeaderSize
+			size = size + totalBytes - toRead
+
+			tmp, s = r.file.Read(buffer[:toRead])
+			if !s.Ok() || len(tmp) != toRead {
 				status = ReadStatusCorruption
 				return
 			}

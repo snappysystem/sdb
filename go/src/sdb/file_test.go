@@ -7,11 +7,8 @@ import (
 	"testing"
 )
 
-const troot string = "/tmp/file_test"
-
 func TestFileAppendAndReadBackSequentially(t *testing.T) {
-	partialPaths := []string{troot, "testFileAppendAndReadBackSequentially"}
-	root := strings.Join(partialPaths, "/")
+	root := "/tmp/file_test/FileAppenedAndReadBackSequentially"
 
 	os.RemoveAll(root)
 	os.MkdirAll(root, os.ModePerm)
@@ -60,8 +57,7 @@ func TestFileAppendAndReadBackSequentially(t *testing.T) {
 }
 
 func TestReadFileSkipSomething(t *testing.T) {
-	partialPaths := []string{troot, "testReadFileSkipSomething"}
-	root := strings.Join(partialPaths, "/")
+	root := "/tmp/file_test/ReadFileSkipSomething"
 
 	os.RemoveAll(root)
 	os.MkdirAll(root, os.ModePerm)
@@ -118,8 +114,7 @@ func TestReadFileSkipSomething(t *testing.T) {
 }
 
 func TestWritableFileMultiAppend(t *testing.T) {
-	partialPaths := []string{troot, "testWritableFileMultiAppend"}
-	root := strings.Join(partialPaths, "/")
+	root := "/tmp/file_test/WriteFileMultiAppend"
 
 	os.RemoveAll(root)
 	os.MkdirAll(root, os.ModePerm)
@@ -193,8 +188,7 @@ func TestWritableFileMultiAppend(t *testing.T) {
 }
 
 func TestRandomAccessFile(t *testing.T) {
-	partialPaths := []string{troot, "testRandomAccessFile"}
-	root := strings.Join(partialPaths, "/")
+	root := "/tmp/file_test/RandomAccessFile"
 
 	os.RemoveAll(root)
 	os.MkdirAll(root, os.ModePerm)
