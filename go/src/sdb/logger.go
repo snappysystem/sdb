@@ -147,7 +147,7 @@ func (r *Reader) ReadRecord(scratch []byte) (ret []byte, status int) {
 			}
 
 			toRead := totalBytes - kHeaderSize
-			size = size + totalBytes - toRead
+			size = size + toRead
 
 			tmp, s = r.file.Read(buffer[:toRead])
 			if !s.Ok() || len(tmp) != toRead {
@@ -180,7 +180,8 @@ func (r *Reader) ReadRecord(scratch []byte) (ret []byte, status int) {
 				return
 
 			default:
-				// continue reading, do nothing here
+				// continue reading
+				buffer = buffer[toRead:]
 			}
 
 		default:
