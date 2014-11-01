@@ -6,9 +6,7 @@ import (
 	"time"
 )
 
-var levels = [...]int{
-	8, 64, 512, 4096, 32768, 262144, 2097152, 16777216, 134217728,
-}
+var levels = [...]int{ 8, 64, 512, 4096, 32768, 262144 }
 
 const maxLevel = len(levels)
 
