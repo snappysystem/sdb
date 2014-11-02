@@ -86,7 +86,7 @@ func TestReaderWriterAcrossSingleBlock(t *testing.T) {
 
 	// prepare parameter to generate a random binary string
 	lowVal, highVal := uint8('a'), uint8('z')
-	minSize, highSize := kBlockSize, kBlockSize + 2
+	minSize, highSize := kBlockSize, kBlockSize+2
 
 	// prepare records to be appended
 	firstRecord := "hello world"
@@ -154,7 +154,7 @@ func TestReaderWriterAcrossMultiBlock(t *testing.T) {
 
 	// prepare parameter to generate a random binary string
 	lowVal, highVal := uint8('a'), uint8('z')
-	minSize, highSize := 2*kBlockSize, 2*kBlockSize + 2
+	minSize, highSize := 2*kBlockSize, 2*kBlockSize+2
 
 	// prepare records to be appended
 	firstRecord := "hello world"

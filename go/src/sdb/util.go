@@ -8,9 +8,9 @@ import (
 // the resulting slice.
 func EncodeUint32(scratch []byte, val uint32) []byte {
 	c, size := cap(scratch), len(scratch)
-	if c < size + 4 {
-		newCap := c*2
-		if (newCap < size + 4) {
+	if c < size+4 {
+		newCap := c * 2
+		if newCap < size+4 {
 			newCap = size + 4
 		}
 		tmp := make([]byte, size, newCap)
@@ -18,7 +18,7 @@ func EncodeUint32(scratch []byte, val uint32) []byte {
 		scratch = tmp
 	}
 
-	scratch = scratch[:(size+4)]
+	scratch = scratch[:(size + 4)]
 	*(*uint32)(unsafe.Pointer(&scratch[size])) = val
 	return scratch
 }
@@ -27,9 +27,9 @@ func EncodeUint32(scratch []byte, val uint32) []byte {
 // the resulting slice.
 func EncodeUint64(scratch []byte, val uint64) []byte {
 	c, size := cap(scratch), len(scratch)
-	if c < size + 8 {
-		newCap := c*2
-		if (newCap < size + 8) {
+	if c < size+8 {
+		newCap := c * 2
+		if newCap < size+8 {
 			newCap = size + 8
 		}
 		tmp := make([]byte, size, newCap)
@@ -37,7 +37,7 @@ func EncodeUint64(scratch []byte, val uint64) []byte {
 		scratch = tmp
 	}
 
-	scratch = scratch[:(size+8)]
+	scratch = scratch[:(size + 8)]
 	*(*uint64)(unsafe.Pointer(&scratch[size])) = val
 	return scratch
 }
@@ -46,9 +46,9 @@ func EncodeUint64(scratch []byte, val uint64) []byte {
 func EncodeSlice(scratch []byte, data []byte) []byte {
 	dsize := len(data)
 	c, size := cap(scratch), len(scratch)
-	if c < size + dsize + 4 {
-		newCap := c*2
-		if (newCap < size + dsize + 4) {
+	if c < size+dsize+4 {
+		newCap := c * 2
+		if newCap < size+dsize+4 {
 			newCap = size + dsize + 4
 		}
 		tmp := make([]byte, size, newCap)
@@ -75,7 +75,6 @@ func DecodeUint32(data []byte) (val uint32, result []byte) {
 	return
 }
 
-
 // decode a uint64 value and return the slice after the bytes
 // have been consumed by the decode process
 func DecodeUint64(data []byte) (val uint64, result []byte) {
@@ -99,14 +98,12 @@ func DecodeSlice(data []byte) (val []byte, result []byte) {
 
 	sliceLen := *(*uint32)(unsafe.Pointer(&data[0]))
 
-	if uint32(origin) < sliceLen + 4 {
+	if uint32(origin) < sliceLen+4 {
 		result = data
 		return
 	}
 
-	val = data[4:sliceLen+4]
+	val = data[4 : sliceLen+4]
 	result = data[sliceLen+4:]
 	return
 }
-
-

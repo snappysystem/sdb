@@ -6,7 +6,6 @@ import (
 
 // Define a few utility functions that unit tests can use
 
-
 // Creating random numbers in the range [low, high), creating @num
 // number of such random number
 func MakeRandomInt(low, high, num int) []int {

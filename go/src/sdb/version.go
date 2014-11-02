@@ -4,19 +4,37 @@ import (
 	"strings"
 )
 
-
 type FileInfo struct {
-	size uint32
-	ref uint32
-	level uint32
+	size   uint32
+	ref    uint32
 	minKey []byte
 	maxKey []byte
+}
+
+func (fi *FileInfo) Ref() {
+	fi.ref = fi.ref + 1
+}
+
+func (fi *FileInfo) Unref(fh uint64, set *VersionSet) {
+	fi.ref = fi.ref - 1
+	switch {
+	case fi.ref > 0:
+		return
+	case fi.ref == 0:
+		// TODO: delete underlying file?
+		delete(set.fileMap, fh)
+	default:
+		panic("file reference becomes negative!")
+	}
+}
+
+func (fi *FileInfo) IsLogFile() bool {
+	return fi.minKey == nil && fi.maxKey == nil
 }
 
 // TODO: should we really skip @ref field?
 func (fi *FileInfo) EncodeTo(scratch []byte) []byte {
 	scratch = EncodeUint32(scratch, fi.size)
-	scratch = EncodeUint32(scratch, fi.level)
 	scratch = EncodeSlice(scratch, fi.minKey)
 	scratch = EncodeSlice(scratch, fi.maxKey)
 	return scratch
@@ -25,27 +43,20 @@ func (fi *FileInfo) EncodeTo(scratch []byte) []byte {
 // decode from a byte buffer. Return the remaining slice. If the buffer
 // cannot be decoded, return the original buffer
 func (fi *FileInfo) DecodeFrom(buffer []byte) (res []byte) {
-	fi.size,res = DecodeUint32(buffer)
+	fi.size, res = DecodeUint32(buffer)
 	if len(res) == len(buffer) {
 		return
 	}
 
 	oldLen := len(res)
-	fi.level,res = DecodeUint32(res)
+	fi.minKey, res = DecodeSlice(res)
 	if len(res) == oldLen {
 		res = buffer
 		return
 	}
 
 	oldLen = len(res)
-	fi.minKey,res = DecodeSlice(res)
-	if len(res) == oldLen {
-		res = buffer
-		return
-	}
-
-	oldLen = len(res)
-	fi.maxKey,res = DecodeSlice(res)
+	fi.maxKey, res = DecodeSlice(res)
 	if len(res) == oldLen {
 		res = buffer
 		return
@@ -56,17 +67,130 @@ func (fi *FileInfo) DecodeFrom(buffer []byte) (res []byte) {
 
 type Version struct {
 	lastSequence uint64
-	logFiles []uint64
-	levels [][]uint64
-	prev *Version
-	next *Version
+	logFiles     []uint64
+	levels       [][]uint64
+	prev         *Version
+	next         *Version
+	set          *VersionSet
+	ref          int
+}
+
+// Make a new version based on information from @origin
+func MakeVersion(set *VersionSet, origin *Version) *Version {
+	ret := &Version{}
+
+	ret.set = set
+	ret.lastSequence = origin.lastSequence
+
+	ret.logFiles = make([]uint64, 0, len(origin.logFiles))
+	for _, fh := range origin.logFiles {
+		fi, ok := set.fileMap[fh]
+		if !ok {
+			panic("Fails to find the file info")
+		}
+
+		fi.Ref()
+		ret.logFiles = append(ret.logFiles, fh)
+	}
+
+	ret.levels = make([][]uint64, 0, len(origin.levels))
+	for _, l := range origin.levels {
+		fs := make([]uint64, 0, len(l))
+		for _, fh := range l {
+			fs = append(fs, fh)
+		}
+		ret.levels = append(ret.levels, fs)
+	}
+
+	return ret
+}
+
+func (v *Version) Ref() {
+	v.ref = v.ref + 1
+}
+
+func (v *Version) Apply(edit *VersionEdit) {
+	v.lastSequence = edit.lastSequence
+	v.set.nextFileNumber = edit.nextFileNumber
+
+	logFiles := make([]uint64, 0, 8)
+
+	for fh, fi := range edit.adds {
+		v.set.fileMap[fh] = fi
+		fi.Ref()
+		if fi.IsLogFile() {
+			logFiles = append(logFiles, fh)
+		}
+	}
+
+	for _, fh := range edit.removes {
+		fi, ok := v.set.fileMap[fh]
+		if !ok {
+			panic("Fails to find a file handle")
+		}
+
+		fi.Unref(fh, v.set)
+	}
+}
+
+// describe a file's level change. If originalLevel or newLevel
+// is a negative value, that means there is no original or
+// newLevel for this change
+type VersionLevelChange struct {
+	fileNumber  uint64
+	originLevel int32
+	newLevel    int32
+}
+
+func (change *VersionLevelChange) MoveLevel(originLevel, newLevel int32) {
+	change.originLevel, change.newLevel = originLevel, newLevel
+}
+
+func (change *VersionLevelChange) RemoveLevel(level int32) {
+	change.originLevel, change.newLevel = level, -1
+}
+
+func (change *VersionLevelChange) AddLevel(level int32) {
+	change.originLevel, change.newLevel = -1, level
+}
+
+func (change *VersionLevelChange) EncodeTo(scratch []byte) []byte {
+	scratch = EncodeUint64(scratch, change.fileNumber)
+	scratch = EncodeUint32(scratch, uint32(change.originLevel))
+	scratch = EncodeUint32(scratch, uint32(change.newLevel))
+	return scratch
+}
+
+func (change *VersionLevelChange) DecodeFrom(buffer []byte) []byte {
+	var res []byte
+	change.fileNumber, res = DecodeUint64(buffer)
+	if len(buffer) == len(res) {
+		return buffer
+	}
+
+	var val uint32
+	oldLen := len(res)
+	val, res = DecodeUint32(res)
+	if len(res) == oldLen {
+		return buffer
+	}
+	change.originLevel = int32(val)
+
+	oldLen = len(res)
+	val, res = DecodeUint32(res)
+	if len(res) == oldLen {
+		return buffer
+	}
+	change.newLevel = int32(val)
+	return res
 }
 
 type VersionEdit struct {
-	adds map[uint64]FileInfo
-	removes []uint64
-	lastSequence uint64
-	nextFileNumber uint64
+	adds                map[uint64]FileInfo
+	removes             []uint64
+	versionLevelChanges []VersionLevelChange
+	lastSequence        uint64
+	nextFileNumber      uint64
 }
 
 func (edit *VersionEdit) AddFile(fileNumber uint64, info *FileInfo) {
@@ -91,7 +215,7 @@ func (edit *VersionEdit) EncodeTo(scratch []byte) []byte {
 		num := len(edit.adds)
 		scratch = EncodeUint32(scratch, uint32(num))
 
-		for k,v := range edit.adds {
+		for k, v := range edit.adds {
 			scratch = EncodeUint64(scratch, k)
 			scratch = (&v).EncodeTo(scratch)
 		}
@@ -102,8 +226,18 @@ func (edit *VersionEdit) EncodeTo(scratch []byte) []byte {
 		num := len(edit.removes)
 		scratch = EncodeUint32(scratch, uint32(num))
 
-		for _,v := range edit.removes {
+		for _, v := range edit.removes {
 			scratch = EncodeUint64(scratch, v)
+		}
+	}
+
+	// encode level changes
+	{
+		num := len(edit.versionLevelChanges)
+		scratch = EncodeUint32(scratch, uint32(num))
+
+		for _, change := range edit.versionLevelChanges {
+			scratch = (&change).EncodeTo(scratch)
 		}
 	}
 
@@ -121,13 +255,13 @@ func (edit *VersionEdit) DecodeFrom(buffer []byte) (ret []byte, ok bool) {
 
 	// decode map
 	{
-		num,remaining := DecodeUint32(buffer)
+		num, remaining := DecodeUint32(buffer)
 		if len(remaining) == len(buffer) {
 			return
 		}
 
 		for i := uint32(0); i < num; i++ {
-			key,result := DecodeUint64(remaining)
+			key, result := DecodeUint64(remaining)
 			if len(result) == len(remaining) {
 				return
 			}
@@ -146,13 +280,13 @@ func (edit *VersionEdit) DecodeFrom(buffer []byte) (ret []byte, ok bool) {
 	// decode removal
 	{
 		oldLen := len(remaining)
-		num,remaining := DecodeUint32(remaining)
+		num, remaining := DecodeUint32(remaining)
 		if len(remaining) == oldLen {
 			return
 		}
 
 		for i := uint32(0); i < num; i++ {
-			key,result := DecodeUint64(remaining)
+			key, result := DecodeUint64(remaining)
 			if len(result) == len(remaining) {
 				return
 			}
@@ -162,9 +296,29 @@ func (edit *VersionEdit) DecodeFrom(buffer []byte) (ret []byte, ok bool) {
 		}
 	}
 
+	// decode level changes
+	{
+		oldLen := len(remaining)
+		num, remaining := DecodeUint32(remaining)
+		if len(remaining) == oldLen {
+			return
+		}
+
+		for i := uint32(0); i < num; i++ {
+			change := VersionLevelChange{}
+			oldLen = len(remaining)
+			remaining = change.DecodeFrom(remaining)
+			if len(remaining) == oldLen {
+				return
+			}
+
+			edit.versionLevelChanges = append(edit.versionLevelChanges, change)
+		}
+	}
+
 	{
 		var result []byte
-		edit.lastSequence,result = DecodeUint64(remaining)
+		edit.lastSequence, result = DecodeUint64(remaining)
 		if len(result) == len(remaining) {
 			return
 		}
@@ -174,28 +328,27 @@ func (edit *VersionEdit) DecodeFrom(buffer []byte) (ret []byte, ok bool) {
 
 	{
 		var result []byte
-		edit.nextFileNumber,result = DecodeUint64(remaining)
+		edit.nextFileNumber, result = DecodeUint64(remaining)
 		if len(result) == len(remaining) {
 			return
 		}
 
-		ret,ok = result,true
+		ret, ok = result, true
 	}
 
 	return
 }
 
 type VersionSet struct {
-	name string
-	lastSequence uint64
+	name           string
+	lastSequence   uint64
 	nextFileNumber uint64
-	current *Version
-	base *Version
-	fileMap map[uint64]FileInfo
-	env Env
-	log SequentialFile
+	current        *Version
+	base           *Version
+	fileMap        map[uint64]FileInfo
+	env            Env
+	log            SequentialFile
 }
-
 
 func MakeVersionSet(name string, env Env) *VersionSet {
 	ret := &VersionSet{}
@@ -239,12 +392,12 @@ func (a *VersionSet) Recover() Status {
 		return MakeStatusCorruption("")
 	}
 
-	fileSize,status := a.env.GetFileSize(manifest)
+	fileSize, status := a.env.GetFileSize(manifest)
 	if !status.Ok() {
 		return status
 	}
 
-	file,status2 := a.env.NewSequentialFile(manifest)
+	file, status2 := a.env.NewSequentialFile(manifest)
 	if !status2.Ok() {
 		return status2
 	}
@@ -252,7 +405,7 @@ func (a *VersionSet) Recover() Status {
 	defer file.Close()
 
 	data := make([]byte, fileSize)
-	res,status3 := file.Read(data)
+	res, status3 := file.Read(data)
 	if !status3.Ok() {
 		return status3
 	}
@@ -265,7 +418,7 @@ func (a *VersionSet) Recover() Status {
 }
 
 func (a *VersionSet) recoverFromLogFile(name string) Status {
-	logFile,status := a.env.NewSequentialFile(name)
+	logFile, status := a.env.NewSequentialFile(name)
 	if !status.Ok() {
 		return status
 	}
