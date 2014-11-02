@@ -4,8 +4,18 @@ package sdb
 type FileInfo struct {
 	size uint32
 	ref uint32
+	level uint32
 	minKey []byte
 	maxKey []byte
+}
+
+// TODO: should we really skip @ref field?
+func (fi *FileInfo) EncodeTo(scratch []byte) []byte {
+	scratch = EncodeUint32(scratch, fi.size)
+	scratch = EncodeUint32(scratch, fi.level)
+	scratch = EncodeSlice(scratch, fi.minKey)
+	scratch = EncodeSlice(scratch, fi.maxKey)
+	return scratch
 }
 
 type Version struct {
@@ -39,8 +49,33 @@ func (edit *VersionEdit) SetNextFileNumber(fileNumber uint64) {
 	edit.nextFileNumber = fileNumber
 }
 
-/*func (edit *VersionEdit) EncodeTo(scratch []byte) []byte {
-}*/
+func (edit *VersionEdit) EncodeTo(scratch []byte) []byte {
+	// encode map
+	{
+		num := len(edit.adds)
+		scratch = EncodeUint32(scratch, uint32(num))
+
+		for k,v := range edit.adds {
+			scratch = EncodeUint64(scratch, k)
+			scratch = (&v).EncodeTo(scratch)
+		}
+	}
+
+	// encode removals
+	{
+		num := len(edit.removes)
+		scratch = EncodeUint32(scratch, uint32(num))
+
+		for _,v := range edit.removes {
+			scratch = EncodeUint64(scratch, v)
+		}
+	}
+
+	scratch = EncodeUint64(scratch, edit.lastSequence)
+	scratch = EncodeUint64(scratch, edit.nextFileNumber)
+
+	return scratch
+}
 
 type VersionSet struct {
 	lastSequence uint64
