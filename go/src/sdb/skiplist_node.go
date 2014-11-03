@@ -99,11 +99,11 @@ func (a *skiplistPointerNode) setChild(child skiplistNode) {
 type skiplistNodeAllocator struct {
 	leafSize    int
 	pointerSize int
-	pool        Allocator
+	pool        *PoolAllocator
 }
 
 // init memory pool, must be called after the allocator is created
-func makeNodeAllocator(bytesAlloc ...Allocator) *skiplistNodeAllocator {
+func makeNodeAllocator(bytesAlloc ...*PoolAllocator) *skiplistNodeAllocator {
 	x1 := skiplistLeafNode{}
 	x2 := skiplistPointerNode{}
 	ret := &skiplistNodeAllocator{}
@@ -111,7 +111,7 @@ func makeNodeAllocator(bytesAlloc ...Allocator) *skiplistNodeAllocator {
 	ret.pointerSize = int(unsafe.Sizeof(x2))
 	switch len(bytesAlloc) {
 	case 0:
-		ret.pool = MakeMemPoolAllocator()
+		ret.pool = MakePoolAllocator()
 	case 1:
 		ret.pool = bytesAlloc[0]
 	default:

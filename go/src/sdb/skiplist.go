@@ -34,7 +34,7 @@ func MakeSkiplist(args ...interface{}) *Skiplist {
 		ret.allocator = makeNodeAllocator()
 	case 2:
 		ret.order = args[0].(Comparator)
-		ret.allocator = makeNodeAllocator(args[1].(Allocator))
+		ret.allocator = makeNodeAllocator(args[1].(*PoolAllocator))
 	default:
 		panic("args is either 0 or 1")
 	}

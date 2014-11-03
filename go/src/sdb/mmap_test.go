@@ -45,3 +45,24 @@ func TestMultiAlloc(t *testing.T) {
 		}
 	}
 }
+
+func TestSinglePoolAlloc(t *testing.T) {
+	mp := MakePoolAllocator()
+	x := mp.Allocate(512)
+	if x == nil {
+		t.Error("Fails to allocate block")
+	}
+}
+
+func TestManyPoolAllocDealloc(t *testing.T) {
+	mp := MakePoolAllocator()
+
+	for i := 0; i < 2048; i++ {
+		x := mp.Allocate(16 * 1024 * 1024)
+		if x == nil {
+			t.Error("Fails to allocate block")
+		}
+	}
+
+	mp.DeallocateAll()
+}
