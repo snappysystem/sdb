@@ -114,13 +114,15 @@ func (v *Version) Apply(edit *VersionEdit) {
 	v.lastSequence = edit.lastSequence
 	v.set.nextFileNumber = edit.nextFileNumber
 
-	logFiles := make([]uint64, 0, 8)
+	logFilesAdded := make([]uint64, 0, 8)
+	logFilesRemoved := make([]uint64, 0, 8)
 
-	for fh, fi := range edit.adds {
-		v.set.fileMap[fh] = fi
+	for _, add := range edit.adds {
+		fi := &add.info
+		v.set.fileMap[add.fileNumber] = *fi
 		fi.Ref()
 		if fi.IsLogFile() {
-			logFiles = append(logFiles, fh)
+			logFilesAdded = append(logFilesAdded, add.fileNumber)
 		}
 	}
 
@@ -181,7 +183,28 @@ func (v *Version) Apply(edit *VersionEdit) {
 			panic("Fails to find a file handle")
 		}
 
+		if fi.IsLogFile() {
+			logFilesRemoved = append(logFilesRemoved, fh)
+		}
+
 		fi.Unref(fh, v.set)
+	}
+
+	for _, fh := range logFilesAdded {
+		v.logFiles = append(v.logFiles, fh)
+	}
+
+	for _, fh := range logFilesRemoved {
+		size := len(v.logFiles)
+		for idx, val := range v.logFiles {
+			if val == fh {
+				for i := idx; i < size-1; i++ {
+					v.logFiles[i] = v.logFiles[i+1]
+				}
+				v.logFiles = v.logFiles[:size-1]
+				break
+			}
+		}
 	}
 }
 
@@ -237,8 +260,13 @@ func (change *VersionLevelChange) DecodeFrom(buffer []byte) []byte {
 	return res
 }
 
+type VersionFileAdd struct {
+	fileNumber uint64
+	info       FileInfo
+}
+
 type VersionEdit struct {
-	adds                map[uint64]FileInfo
+	adds                []VersionFileAdd
 	removes             []uint64
 	versionLevelChanges []VersionLevelChange
 	lastSequence        uint64
@@ -246,7 +274,8 @@ type VersionEdit struct {
 }
 
 func (edit *VersionEdit) AddFile(fileNumber uint64, info *FileInfo) {
-	edit.adds[fileNumber] = *info
+	add := VersionFileAdd{fileNumber, *info}
+	edit.adds = append(edit.adds, add)
 }
 
 func (edit *VersionEdit) RemoveFile(fileNumber uint64) {
@@ -267,9 +296,9 @@ func (edit *VersionEdit) EncodeTo(scratch []byte) []byte {
 		num := len(edit.adds)
 		scratch = EncodeUint32(scratch, uint32(num))
 
-		for k, v := range edit.adds {
-			scratch = EncodeUint64(scratch, k)
-			scratch = (&v).EncodeTo(scratch)
+		for _, v := range edit.adds {
+			scratch = EncodeUint64(scratch, v.fileNumber)
+			scratch = (&v.info).EncodeTo(scratch)
 		}
 	}
 
@@ -305,7 +334,7 @@ func (edit *VersionEdit) EncodeTo(scratch []byte) []byte {
 func (edit *VersionEdit) DecodeFrom(buffer []byte) (ret []byte, ok bool) {
 	var remaining []byte
 
-	// decode map
+	// decode adds
 	{
 		num, remaining := DecodeUint32(buffer)
 		if len(remaining) == len(buffer) {
@@ -324,7 +353,8 @@ func (edit *VersionEdit) DecodeFrom(buffer []byte) (ret []byte, ok bool) {
 				return
 			}
 
-			edit.adds[key] = fi
+			add := VersionFileAdd{key, fi}
+			edit.adds = append(edit.adds, add)
 			remaining = result2
 		}
 	}
@@ -479,20 +509,33 @@ func (a *VersionSet) recoverFromLogFile(name string) Status {
 
 	defer logFile.Close()
 
-	/*edit := VersionEdit{}
+	version := MakeVersion(a, a.current)
 	buffer := [4096]byte{}
 	reader := Reader{logFile, 0, true}
 
 	for true {
-		record,result := reader.ReadRecord(buffer[:])
+		record, result := reader.ReadRecord(buffer[:])
 		switch result {
 		case ReadStatusOk:
+			edit := VersionEdit{}
+			_, ok := edit.DecodeFrom(record)
+			if !ok {
+				return MakeStatusCorruption("")
+			}
+
+			version.Apply(&edit)
+
 		case ReadStatusEOF:
+			a.AddVersion(version)
+			return MakeStatusOk()
+
 		case ReadStatusCorruption:
+			return MakeStatusCorruption("")
+
 		default:
 			panic("unexpected result")
 		}
-	}*/
+	}
 
 	panic("should not reach here")
 	return MakeStatusCorruption("")
