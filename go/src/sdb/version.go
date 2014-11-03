@@ -1,6 +1,7 @@
 package sdb
 
 import (
+	"sort"
 	"strings"
 )
 
@@ -120,6 +121,57 @@ func (v *Version) Apply(edit *VersionEdit) {
 		fi.Ref()
 		if fi.IsLogFile() {
 			logFiles = append(logFiles, fh)
+		}
+	}
+
+	for _, change := range edit.versionLevelChanges {
+		if change.originLevel >= 0 {
+			level := v.levels[change.originLevel]
+			for idx, val := range level {
+				// remove the file number from the level
+				if val == change.fileNumber {
+					last := len(level) - 1
+					for ; idx < last; idx++ {
+						level[idx] = level[idx+1]
+					}
+					v.levels[change.originLevel] = level[:last-1]
+					break
+				}
+			}
+		}
+	}
+
+	for _, change := range edit.versionLevelChanges {
+		if change.newLevel >= 0 {
+			level := v.levels[change.newLevel]
+			info, ok := v.set.fileMap[change.fileNumber]
+			if !ok {
+				panic("Fails to find file info")
+			}
+
+			key := info.minKey
+			size := len(level)
+
+			idx := sort.Search(
+				size,
+				func(i int) bool {
+					fh := level[i]
+					fi, ok := v.set.fileMap[fh]
+					if !ok {
+						panic("Fails to find file handle!")
+					}
+
+					return v.set.comparator.Compare(fi.minKey, key) >= 0
+				})
+
+			// insert the new file number into the correct place
+			level = append(level, uint64(0))
+			for i := idx; i < size; i++ {
+				level[i+1] = level[i]
+			}
+
+			level[idx] = change.fileNumber
+			v.levels[change.newLevel] = level
 		}
 	}
 
@@ -347,10 +399,11 @@ type VersionSet struct {
 	base           *Version
 	fileMap        map[uint64]FileInfo
 	env            Env
+	comparator     Comparator
 	log            SequentialFile
 }
 
-func MakeVersionSet(name string, env Env) *VersionSet {
+func MakeVersionSet(name string, env Env, c Comparator) *VersionSet {
 	ret := &VersionSet{}
 
 	ret.base = &Version{}
@@ -360,6 +413,7 @@ func MakeVersionSet(name string, env Env) *VersionSet {
 
 	ret.name = name
 	ret.env = env
+	ret.comparator = c
 
 	return ret
 }
