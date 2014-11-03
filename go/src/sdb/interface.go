@@ -40,7 +40,7 @@ type Status interface {
 type Env interface {
 	NewSequentialFile(name string) (SequentialFile, Status)
 	NewRandomAccessFile(name string) (RandomAccessFile, Status)
-	NewWritableFil(name string) (WritableFile, Status)
+	NewWritableFile(name string) (WritableFile, Status)
 	FileExists(name string) bool
 	GetChildren(dir string) ([]string, Status)
 	DeleteFile(name string) Status

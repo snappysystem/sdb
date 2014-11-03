@@ -1,6 +1,7 @@
 package sdb
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -66,6 +67,7 @@ func (fi *FileInfo) DecodeFrom(buffer []byte) (res []byte) {
 	return
 }
 
+// describe a particular version (snapshot)
 type Version struct {
 	lastSequence uint64
 	logFiles     []uint64
@@ -260,34 +262,19 @@ func (change *VersionLevelChange) DecodeFrom(buffer []byte) []byte {
 	return res
 }
 
+// describe the event that adds a new file to the system
 type VersionFileAdd struct {
 	fileNumber uint64
 	info       FileInfo
 }
 
+// describe changes made on top of a base version
 type VersionEdit struct {
 	adds                []VersionFileAdd
 	removes             []uint64
 	versionLevelChanges []VersionLevelChange
 	lastSequence        uint64
 	nextFileNumber      uint64
-}
-
-func (edit *VersionEdit) AddFile(fileNumber uint64, info *FileInfo) {
-	add := VersionFileAdd{fileNumber, *info}
-	edit.adds = append(edit.adds, add)
-}
-
-func (edit *VersionEdit) RemoveFile(fileNumber uint64) {
-	edit.removes = append(edit.removes, fileNumber)
-}
-
-func (edit *VersionEdit) SetLastSequence(seq uint64) {
-	edit.lastSequence = seq
-}
-
-func (edit *VersionEdit) SetNextFileNumber(fileNumber uint64) {
-	edit.nextFileNumber = fileNumber
 }
 
 func (edit *VersionEdit) EncodeTo(scratch []byte) []byte {
@@ -430,7 +417,7 @@ type VersionSet struct {
 	fileMap        map[uint64]FileInfo
 	env            Env
 	comparator     Comparator
-	log            SequentialFile
+	log            WritableFile
 }
 
 func MakeVersionSet(name string, env Env, c Comparator) *VersionSet {
@@ -467,8 +454,69 @@ func (a *VersionSet) RemoveVersion(b *Version) {
 	b.next.prev = b.prev
 }
 
-/*func (a *VersionSet) LogAndApply(e *VersionEdit) Status {
-}*/
+func (a *VersionSet) LogAndApply(e *VersionEdit) Status {
+	var log WritableFile
+	var name string
+
+	// create a new version log file if we have not done so
+	if a.log == nil {
+		name = fmt.Sprintf("%s/version_%d.log", a.name, e.nextFileNumber)
+		e.nextFileNumber = e.nextFileNumber + 1
+		var s Status
+		log, s = a.env.NewWritableFile(name)
+		if !s.Ok() {
+			return s
+		}
+	} else {
+		log = a.log
+	}
+
+	{
+		record := make([]byte, 0, 4096)
+		record = e.EncodeTo(record)
+		s := log.Append(record)
+
+		if !s.Ok() {
+			return s
+		}
+	}
+
+	if a.current.ref == 0 {
+		a.current.Apply(e)
+	} else {
+		newVersion := MakeVersion(a, a.current)
+		newVersion.Apply(e)
+		a.AddVersion(newVersion)
+	}
+
+	// create a new manifest file if we have not done so
+	if a.log == nil {
+		a.log = log
+		manifest := fmt.Sprintf("%s/manifest", a.name)
+		future := fmt.Sprintf("%s/manifest.future", a.name)
+
+		a.env.DeleteFile(future)
+		futureFile, status := a.env.NewWritableFile(future)
+		if !status.Ok() {
+			return status
+		}
+
+		futureFile.Append([]byte(name))
+		futureFile.Close()
+
+		status = a.env.DeleteFile(manifest)
+		if !status.Ok() {
+			return status
+		}
+
+		status = a.env.RenameFile(future, manifest)
+		if !status.Ok() {
+			return status
+		}
+	}
+
+	return MakeStatusOk()
+}
 
 func (a *VersionSet) Recover() Status {
 	manifest := strings.Join([]string{a.name, "manifest"}, "/")
