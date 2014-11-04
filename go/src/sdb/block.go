@@ -24,6 +24,7 @@ type BlockBuilder struct {
 
 // A tailer of block, always at the end of a block
 type blockTailer struct {
+	startOffset		uint32
 	dataSize      uint32
 	numKeys       uint32
 	restartOffset uint32
@@ -263,6 +264,7 @@ func (a *BlockBuilder) Finalize() (ret *Block, ok bool) {
 		return
 	}
 
+	tail.startOffset = a.startOffset
 	tail.dataSize = a.dataSize
 	tail.numKeys = uint32(len(a.keys))
 	tail.restartOffset = restart
@@ -279,4 +281,23 @@ func (a *BlockBuilder) Finalize() (ret *Block, ok bool) {
 	ok = true
 
 	return
+}
+
+// recover a block from a binary slice.
+func DecodeBlock(data []byte, endOffset uint32) *Block {
+	tailerSize := uint32(unsafe.Sizeof(modelTailer))
+	if tailerSize > endOffset {
+		return nil
+	}
+
+	tail := (*blockTailer)(unsafe.Pointer(&data[endOffset - tailerSize]))
+	ret := &Block{}
+
+	ret.data = data
+	ret.firstOffset = tail.startOffset
+	ret.lastOffset = endOffset
+	ret.restartOffset = tail.restartOffset
+	ret.numKeys = tail.numKeys
+
+	return ret
 }

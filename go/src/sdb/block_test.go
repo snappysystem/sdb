@@ -126,3 +126,51 @@ func TestBlockBackwardSeek(t *testing.T) {
 		t.Error("iter has extra value")
 	}
 }
+
+func TestBlockEncodeDecode(t *testing.T) {
+	// first build the block
+	data := make([]byte, 4096)
+	var endOffset uint32
+
+	{
+		builder := MakeBlockBuilder(data, 0)
+
+		for i := 100; i < 105; i++ {
+			s := strconv.Itoa(i)
+			b := []byte(s)
+			builder.Add(b, b)
+		}
+
+		block, ok := builder.Finalize()
+		if !ok {
+			t.Error("Fails to build block")
+		}
+
+		endOffset = block.lastOffset
+	}
+
+	{
+		block := DecodeBlock(data, endOffset)
+
+		// seek to one entry in the block
+		order := &BytesSkiplistOrder{}
+		iter := block.NewIterator(order)
+		iter.Seek([]byte("103"))
+
+		for i := 103; i >= 100; i-- {
+			if !iter.Valid() {
+				t.Error("iter ends prematurely")
+			}
+			s := strconv.Itoa(i)
+			if string(iter.Key()) != s {
+				t.Error("Fails to seek to ", s)
+			}
+
+			iter.Prev()
+		}
+
+		if iter.Valid() {
+			t.Error("iter has extra value")
+		}
+	}
+}
