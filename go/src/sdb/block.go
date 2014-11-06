@@ -24,7 +24,7 @@ type BlockBuilder struct {
 
 // A tailer of block, always at the end of a block
 type blockTailer struct {
-	startOffset		uint32
+	startOffset   uint32
 	dataSize      uint32
 	numKeys       uint32
 	restartOffset uint32
@@ -290,7 +290,7 @@ func DecodeBlock(data []byte, endOffset uint32) *Block {
 		return nil
 	}
 
-	tail := (*blockTailer)(unsafe.Pointer(&data[endOffset - tailerSize]))
+	tail := (*blockTailer)(unsafe.Pointer(&data[endOffset-tailerSize]))
 	ret := &Block{}
 
 	ret.data = data
