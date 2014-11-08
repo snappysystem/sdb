@@ -15,25 +15,20 @@ import (
 )
 
 type BlockBuilder struct {
-	data        []byte
-	startOffset uint32
-	cur         uint32
-	dataSize    uint32
-	keys        []uint32
+	data []byte
+	cur  uint32
+	keys []uint32
 }
 
 // A tailer of block, always at the end of a block
 type blockTailer struct {
-	startOffset   uint32
-	dataSize      uint32
+	blockSize     uint32
 	numKeys       uint32
 	restartOffset uint32
 }
 
 type Block struct {
 	data          []byte
-	firstOffset   uint32
-	lastOffset    uint32
 	restartOffset uint32
 	numKeys       uint32
 }
@@ -170,12 +165,9 @@ func (a *blockIter) Value() []byte {
 
 // create a new BlockBuilder and initialize it
 // pass the slice that is going to be used to build the block
-// along with the offset from where the block is going to build
-func MakeBlockBuilder(data []byte, off uint32) *BlockBuilder {
+func MakeBlockBuilder(data []byte) *BlockBuilder {
 	ret := &BlockBuilder{}
 	ret.data = data
-	ret.startOffset = off
-	ret.cur = off
 	ret.keys = make([]uint32, 0, 16*1024)
 	return ret
 }
@@ -196,7 +188,6 @@ func (a *BlockBuilder) Add(key []byte, val []byte) bool {
 			return false
 		}
 		a.cur = a.cur + uint32(s)
-		a.dataSize = a.dataSize + uint32(s)
 	}
 
 	// append value length
@@ -208,7 +199,6 @@ func (a *BlockBuilder) Add(key []byte, val []byte) bool {
 			return false
 		}
 		a.cur = a.cur + uint32(s)
-		a.dataSize = a.dataSize + uint32(s)
 	}
 
 	// append key
@@ -219,7 +209,6 @@ func (a *BlockBuilder) Add(key []byte, val []byte) bool {
 			return false
 		}
 		a.cur = a.cur + uint32(s)
-		a.dataSize = a.dataSize + uint32(keylen)
 	}
 
 	// append value
@@ -229,7 +218,6 @@ func (a *BlockBuilder) Add(key []byte, val []byte) bool {
 			return false
 		}
 		a.cur = a.cur + uint32(s)
-		a.dataSize = a.dataSize + uint32(vallen)
 	}
 
 	a.keys = append(a.keys, entryOffset)
@@ -242,7 +230,7 @@ var modelTailer blockTailer
 // the boundary of the block. Return true if operation succeeds
 func (a *BlockBuilder) Finalize() (ret *Block, ok bool) {
 	// align starting of restart offset to 8 byte boundary
-	restart := a.startOffset + a.dataSize
+	restart := a.cur
 	restart = (restart + 7) / 8 * 8
 	pos := restart
 
@@ -264,19 +252,21 @@ func (a *BlockBuilder) Finalize() (ret *Block, ok bool) {
 		return
 	}
 
-	tail.startOffset = a.startOffset
-	tail.dataSize = a.dataSize
+	tail.blockSize = pos
 	tail.numKeys = uint32(len(a.keys))
 	tail.restartOffset = restart
 
 	//prepare result
 	ret = &Block{}
 
-	ret.data = a.data
-	ret.firstOffset = a.startOffset
-	ret.lastOffset = pos
+	ret.data = a.data[:pos]
 	ret.restartOffset = restart
 	ret.numKeys = uint32(len(a.keys))
+
+	// reset builder
+	a.data = a.data[pos:]
+	a.cur = 0
+	a.keys = a.keys[:0]
 
 	ok = true
 
@@ -293,9 +283,13 @@ func DecodeBlock(data []byte, endOffset uint32) *Block {
 	tail := (*blockTailer)(unsafe.Pointer(&data[endOffset-tailerSize]))
 	ret := &Block{}
 
-	ret.data = data
-	ret.firstOffset = tail.startOffset
-	ret.lastOffset = endOffset
+	// make sure data is valid
+	startOffset := endOffset - tail.blockSize
+	if startOffset < 0 {
+		return nil
+	}
+
+	ret.data = data[startOffset:endOffset]
 	ret.restartOffset = tail.restartOffset
 	ret.numKeys = tail.numKeys
 

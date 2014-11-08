@@ -152,8 +152,8 @@ func MakeTableBuilder(data1, data2 []byte, f WritableFile) *TableBuilder {
 	ret.indexData = data2
 	ret.file = f
 
-	ret.leafBuilder = MakeBlockBuilder(data1, 0)
-	ret.indexBuilder = MakeBlockBuilder(data2, 0)
+	ret.leafBuilder = MakeBlockBuilder(data1)
+	ret.indexBuilder = MakeBlockBuilder(data2)
 
 	return ret
 }
@@ -183,7 +183,7 @@ func (a *TableBuilder) Add(key, value []byte) {
 			if !ok {
 				panic("leaf builder fails to finalize")
 			}
-			off := b.lastOffset
+			off := uint32(len(b.data))
 			indexValue := make([]byte, 4)
 			*(*uint32)(unsafe.Pointer(&indexValue[0])) = off
 			a.indexBuilder.Add(key, indexValue)
@@ -197,16 +197,16 @@ func (a *TableBuilder) Finalize(c Comparator) {
 	if !ok {
 		panic("leaf builder fails to finalize")
 	}
-	a.leafSize = b.lastOffset
+	a.leafSize = uint32(len(b.data))
 	indexValue := make([]byte, 4)
-	*(*uint32)(unsafe.Pointer(&indexValue[0])) = b.lastOffset
+	*(*uint32)(unsafe.Pointer(&indexValue[0])) = a.leafSize
 	a.indexBuilder.Add(a.prevKey, indexValue)
 
 	b, ok = a.indexBuilder.Finalize()
 	if !ok {
 		panic("index builder fails to finalize")
 	}
-	a.indexSize = b.lastOffset
+	a.indexSize = uint32(len(b.data))
 
 	// format of a table file: first part is many leaf blocks
 	status := a.file.Append(a.leafData[:a.leafSize])

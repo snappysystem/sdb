@@ -9,7 +9,7 @@ import (
 func TestCreateAndEnumerateBlock(t *testing.T) {
 	// first build the block
 	data := make([]byte, 4096)
-	builder := MakeBlockBuilder(data, 0)
+	builder := MakeBlockBuilder(data)
 
 	for i := 100; i < 105; i++ {
 		s := strconv.Itoa(i)
@@ -54,7 +54,7 @@ func TestCreateAndEnumerateBlock(t *testing.T) {
 func TestBlockRandomSeek(t *testing.T) {
 	// first build the block
 	data := make([]byte, 4096)
-	builder := MakeBlockBuilder(data, 0)
+	builder := MakeBlockBuilder(data)
 
 	for i := 100; i < 105; i++ {
 		s := strconv.Itoa(i)
@@ -92,7 +92,7 @@ func TestBlockRandomSeek(t *testing.T) {
 func TestBlockBackwardSeek(t *testing.T) {
 	// first build the block
 	data := make([]byte, 4096)
-	builder := MakeBlockBuilder(data, 0)
+	builder := MakeBlockBuilder(data)
 
 	for i := 100; i < 105; i++ {
 		s := strconv.Itoa(i)
@@ -133,7 +133,7 @@ func TestBlockEncodeDecode(t *testing.T) {
 	var endOffset uint32
 
 	{
-		builder := MakeBlockBuilder(data, 0)
+		builder := MakeBlockBuilder(data)
 
 		for i := 100; i < 105; i++ {
 			s := strconv.Itoa(i)
@@ -146,7 +146,7 @@ func TestBlockEncodeDecode(t *testing.T) {
 			t.Error("Fails to build block")
 		}
 
-		endOffset = block.lastOffset
+		endOffset = uint32(len(block.data))
 	}
 
 	{
