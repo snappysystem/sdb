@@ -12,10 +12,13 @@ import (
 // corresponding entries in leaf block
 
 const (
-	// how frequent a full key should appear in index block
-	kEntriesPerFullKey           = 8
+	// how frequent a full key should appear in leaf block
+	kEntriesPerFullKey = 8
+	// Suppose each table has !MB data and each entry is 100 bytes,
+	// a table will have 10K entries and we will have 20 entries
+	// in index block
 	kNumLeafEntriesPerIndexEntry = 512
-	// how big a table should be
+	// how big a table should be, default to 1MB
 	kTableSizeHint = 1024 * 1024
 )
 
@@ -135,9 +138,9 @@ type TableBuilder struct {
 	leafData     []byte
 	indexData    []byte
 	leafNumber   uint32
-	leafSize     uint32
 	indexSize    uint32
 	numEntries   uint32
+	leafPos      uint32
 	firstKey     []byte
 	prevKey      []byte
 	file         WritableFile
@@ -145,6 +148,9 @@ type TableBuilder struct {
 	indexBuilder *BlockBuilder
 }
 
+// Provide a byte slice to hold leaf blocks, a byte slice to hold
+// index block, and a writable file to save the persistent table
+// data, return a pointer to a new TableBuilder
 func MakeTableBuilder(data1, data2 []byte, f WritableFile) *TableBuilder {
 	ret := &TableBuilder{}
 
@@ -184,6 +190,7 @@ func (a *TableBuilder) Add(key, value []byte) {
 				panic("leaf builder fails to finalize")
 			}
 			off := uint32(len(b.data))
+			a.leafPos = a.leafPos + off
 			indexValue := make([]byte, 4)
 			*(*uint32)(unsafe.Pointer(&indexValue[0])) = off
 			a.indexBuilder.Add(key, indexValue)
@@ -197,9 +204,10 @@ func (a *TableBuilder) Finalize(c Comparator) {
 	if !ok {
 		panic("leaf builder fails to finalize")
 	}
-	a.leafSize = uint32(len(b.data))
+	off := uint32(len(b.data))
+	a.leafPos = a.leafPos + off
 	indexValue := make([]byte, 4)
-	*(*uint32)(unsafe.Pointer(&indexValue[0])) = a.leafSize
+	*(*uint32)(unsafe.Pointer(&indexValue[0])) = off
 	a.indexBuilder.Add(a.prevKey, indexValue)
 
 	b, ok = a.indexBuilder.Finalize()
@@ -209,7 +217,7 @@ func (a *TableBuilder) Finalize(c Comparator) {
 	a.indexSize = uint32(len(b.data))
 
 	// format of a table file: first part is many leaf blocks
-	status := a.file.Append(a.leafData[:a.leafSize])
+	status := a.file.Append(a.leafData[:a.leafPos])
 	if !status.Ok() {
 		panic("fails to write to table file")
 	}
@@ -229,7 +237,7 @@ type Table struct {
 
 // read table from disk file. Pass in a buffer that is the same
 // size as the file size
-/*func RecoverTable(name string, buffer []byte, c Comparator, env Env) *Table {
+func RecoverTable(name string, buffer []byte, c Comparator, env Env) *Table {
 	file, status := env.NewSequentialFile(name)
 	if !status.Ok() {
 		return nil
@@ -238,7 +246,7 @@ type Table struct {
 	defer file.Close()
 
 	var used []byte
-	used,status := file.Read(buffer)
+	used, status = file.Read(buffer)
 	if !status.Ok() || len(used) != len(buffer) {
 		return nil
 	}
@@ -248,7 +256,10 @@ type Table struct {
 
 	ret.comparator = c
 	ret.leafData = used
-}*/
+	ret.index = DecodeBlock(used, uint32(pos))
+
+	return ret
+}
 
 func (t *Table) NewIterator() Iterator {
 	ret := &DifferentialDecodingIter{RawTableIter{}, nil}
