@@ -64,46 +64,57 @@ func DecodeDifferentialKey(prev, current []byte) []byte {
 	return ret
 }
 
+// leaf blocks use differential encoded key. This iterator is used
+// to decode partial keys in leaf block so that the returned
+// key value from Key() is always a full key
 type DifferentialDecodingIter struct {
-	RawTableIter
-	prevKey []byte
+	blockIter Iterator
+	prevKey   []byte
+}
+
+func (it *DifferentialDecodingIter) Valid() bool {
+	return it.blockIter.Valid()
+}
+
+func (it *DifferentialDecodingIter) Value() []byte {
+	return it.blockIter.Value()
 }
 
 func (it *DifferentialDecodingIter) SeekToFirst() {
-	it.RawTableIter.SeekToFirst()
+	it.blockIter.SeekToFirst()
 	it.prevKey = nil
 }
 
 func (it *DifferentialDecodingIter) SeekToLast() {
-	it.RawTableIter.SeekToLast()
+	it.blockIter.SeekToLast()
 	it.prevKey = nil
 }
 
 func (it *DifferentialDecodingIter) Seek(key []byte) {
-	it.RawTableIter.Seek(key)
+	it.blockIter.Seek(key)
 	it.prevKey = nil
 }
 
 func (it *DifferentialDecodingIter) Next() {
 	it.prevKey = it.Key()
-	it.RawTableIter.Next()
+	it.blockIter.Next()
 }
 
 func (it *DifferentialDecodingIter) Prev() {
-	it.RawTableIter.Prev()
+	it.blockIter.Prev()
 	it.prevKey = nil
 }
 
 func (it *DifferentialDecodingIter) Key() []byte {
 	for true {
 		if it.prevKey != nil {
-			return DecodeDifferentialKey(it.prevKey, it.RawTableIter.Key())
+			return DecodeDifferentialKey(it.prevKey, it.blockIter.Key())
 		} else {
 			// previous key is not available, search backward for it
 			var curKey []byte
 			backoff := 0
 			for true {
-				curKey = it.RawTableIter.Key()
+				curKey = it.blockIter.Key()
 				if *(*uint8)(unsafe.Pointer(&curKey[0])) == uint8(0) {
 					break
 				} else {
@@ -118,7 +129,7 @@ func (it *DifferentialDecodingIter) Key() []byte {
 			// derive latter keys from the nearest full key
 			for ; backoff > 1; backoff-- {
 				it.Next()
-				curKey = DecodeDifferentialKey(curKey, it.RawTableIter.Key())
+				curKey = DecodeDifferentialKey(curKey, it.blockIter.Key())
 			}
 
 			it.prevKey = curKey
@@ -262,25 +273,27 @@ func RecoverTable(name string, buffer []byte, c Comparator, env Env) *Table {
 }
 
 func (t *Table) NewIterator() Iterator {
-	ret := &DifferentialDecodingIter{RawTableIter{}, nil}
+	ret := &TableIter{}
 	ret.table = t
 	ret.indexIter = t.index.NewIterator(t.comparator)
 	return ret
 }
 
-type RawTableIter struct {
+// This iterator composite an index block iterator and leaf block
+// iterators
+type TableIter struct {
 	table     *Table
 	leafBlock *Block
 	indexIter Iterator
-	leafIter  Iterator
+	leafIter  *DifferentialDecodingIter
 	valid     bool
 }
 
-func (it *RawTableIter) Valid() bool {
+func (it *TableIter) Valid() bool {
 	return it.valid
 }
 
-func (it *RawTableIter) SeekToFirst() {
+func (it *TableIter) SeekToFirst() {
 	it.valid = false
 	it.indexIter.SeekToFirst()
 	if it.indexIter.Valid() {
@@ -288,7 +301,8 @@ func (it *RawTableIter) SeekToFirst() {
 		lastOff := *(*uint32)(unsafe.Pointer(&val[0]))
 		it.leafBlock = DecodeBlock(it.table.leafData, lastOff)
 		if it.leafBlock != nil {
-			it.leafIter = it.leafBlock.NewIterator(it.table.comparator)
+			rawIt := it.leafBlock.NewIterator(it.table.comparator)
+			it.leafIter = &DifferentialDecodingIter{rawIt, nil}
 			it.leafIter.SeekToFirst()
 			if it.leafIter.Valid() {
 				it.valid = true
@@ -297,7 +311,7 @@ func (it *RawTableIter) SeekToFirst() {
 	}
 }
 
-func (it *RawTableIter) SeekToLast() {
+func (it *TableIter) SeekToLast() {
 	it.valid = false
 	it.indexIter.SeekToLast()
 	if it.indexIter.Valid() {
@@ -305,7 +319,8 @@ func (it *RawTableIter) SeekToLast() {
 		lastOff := *(*uint32)(unsafe.Pointer(&val[0]))
 		it.leafBlock = DecodeBlock(it.table.leafData, lastOff)
 		if it.leafBlock != nil {
-			it.leafIter = it.leafBlock.NewIterator(it.table.comparator)
+			rawIter := it.leafBlock.NewIterator(it.table.comparator)
+			it.leafIter = &DifferentialDecodingIter{rawIter, nil}
 			it.leafIter.SeekToLast()
 			if it.leafIter.Valid() {
 				it.valid = true
@@ -314,7 +329,7 @@ func (it *RawTableIter) SeekToLast() {
 	}
 }
 
-func (it *RawTableIter) Seek(key []byte) {
+func (it *TableIter) Seek(key []byte) {
 	it.valid = false
 	it.indexIter.Seek(key)
 	if it.indexIter.Valid() {
@@ -322,7 +337,8 @@ func (it *RawTableIter) Seek(key []byte) {
 		lastOff := *(*uint32)(unsafe.Pointer(&val[0]))
 		it.leafBlock = DecodeBlock(it.table.leafData, lastOff)
 		if it.leafBlock != nil {
-			it.leafIter = it.leafBlock.NewIterator(it.table.comparator)
+			rawIt := it.leafBlock.NewIterator(it.table.comparator)
+			it.leafIter = &DifferentialDecodingIter{rawIt, nil}
 			it.leafIter.Seek(key)
 			if it.leafIter.Valid() {
 				it.valid = true
@@ -331,7 +347,7 @@ func (it *RawTableIter) Seek(key []byte) {
 	}
 }
 
-func (it *RawTableIter) Next() {
+func (it *TableIter) Next() {
 	// Next() and Prev() should be called only if the iterator is valid
 	// If one wants to scan to the end and change direction, he should
 	// use SeekToFirst() or SeekToLast() before Next() or Prev() is
@@ -350,7 +366,8 @@ func (it *RawTableIter) Next() {
 			it.leafBlock = DecodeBlock(it.table.leafData, lastOff)
 
 			if it.leafBlock != nil {
-				it.leafIter = it.leafBlock.NewIterator(it.table.comparator)
+				rawIter := it.leafBlock.NewIterator(it.table.comparator)
+				it.leafIter = &DifferentialDecodingIter{rawIter, nil}
 				it.leafIter.SeekToFirst()
 				if it.leafIter.Valid() {
 					it.valid = true
@@ -360,7 +377,7 @@ func (it *RawTableIter) Next() {
 	}
 }
 
-func (it *RawTableIter) Prev() {
+func (it *TableIter) Prev() {
 	if !it.valid {
 		panic("iterator is not valid")
 	}
@@ -375,7 +392,8 @@ func (it *RawTableIter) Prev() {
 			it.leafBlock = DecodeBlock(it.table.leafData, lastOff)
 
 			if it.leafBlock != nil {
-				it.leafIter = it.leafBlock.NewIterator(it.table.comparator)
+				rawIter := it.leafBlock.NewIterator(it.table.comparator)
+				it.leafIter = &DifferentialDecodingIter{rawIter, nil}
 				it.leafIter.SeekToLast()
 				if it.leafIter.Valid() {
 					it.valid = true
@@ -385,10 +403,10 @@ func (it *RawTableIter) Prev() {
 	}
 }
 
-func (it *RawTableIter) Key() []byte {
+func (it *TableIter) Key() []byte {
 	return it.leafIter.Key()
 }
 
-func (it *RawTableIter) Value() []byte {
+func (it *TableIter) Value() []byte {
 	return it.leafIter.Value()
 }
