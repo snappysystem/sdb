@@ -7,7 +7,7 @@ func MmapAlloc(length int) (data []byte, err error) {
 	data, err = syscall.Mmap(
 		-1, 0, length,
 		syscall.PROT_READ|syscall.PROT_WRITE,
-		syscall.MAP_ANONYMOUS|syscall.MAP_PRIVATE)
+		syscall.MAP_ANON|syscall.MAP_PRIVATE)
 	return
 }
 

@@ -36,6 +36,7 @@ func EncodeDifferentialKey(prev, current []byte) []byte {
 	for i := 0; i < short; i++ {
 		if prev[i] != current[i] {
 			common = i
+			break
 		}
 	}
 
@@ -210,7 +211,7 @@ func (a *TableBuilder) Add(key, value []byte) {
 	}
 }
 
-func (a *TableBuilder) Finalize(c Comparator) {
+func (a *TableBuilder) Finalize(c Comparator) *Table {
 	b, ok := a.leafBuilder.Finalize()
 	if !ok {
 		panic("leaf builder fails to finalize")
@@ -238,6 +239,9 @@ func (a *TableBuilder) Finalize(c Comparator) {
 	if !status.Ok() {
 		panic("fails to write to table file")
 	}
+
+	ret := &Table{b, a.leafData, c}
+	return ret
 }
 
 type Table struct {
@@ -248,16 +252,8 @@ type Table struct {
 
 // read table from disk file. Pass in a buffer that is the same
 // size as the file size
-func RecoverTable(name string, buffer []byte, c Comparator, env Env) *Table {
-	file, status := env.NewSequentialFile(name)
-	if !status.Ok() {
-		return nil
-	}
-
-	defer file.Close()
-
-	var used []byte
-	used, status = file.Read(buffer)
+func RecoverTable(file SequentialFile, buffer []byte, c Comparator) *Table {
+	used, status := file.Read(buffer)
 	if !status.Ok() || len(used) != len(buffer) {
 		return nil
 	}
