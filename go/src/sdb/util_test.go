@@ -79,6 +79,29 @@ func TestEncodeAndDecodeSlice(t *testing.T) {
 	}
 }
 
+func TestEncodeAndDecodeVarInt(t *testing.T) {
+	scratch := make([]byte, 0)
+	data := [...]uint64{876501232345, 34, 123456, 345}
+
+	for _, val := range data {
+		scratch = EncodeVarInt(scratch, val)
+	}
+
+	for _, val := range data {
+		var res uint64
+		oldSize := len(scratch)
+		res, scratch = DecodeVarInt(scratch)
+
+		if oldSize == len(scratch) {
+			t.Error("Fails to decode")
+		}
+
+		if res != val {
+			t.Error("decode a wrong value ", res, " expected ", val)
+		}
+	}
+}
+
 func TestEncodeDecodeMultiObjects(t *testing.T) {
 	scratch := make([]byte, 0)
 

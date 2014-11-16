@@ -42,6 +42,84 @@ func EncodeUint64(scratch []byte, val uint64) []byte {
 	return scratch
 }
 
+// encode an integer value to a byte array, returns the resulting
+// encoded slice
+func EncodeVarInt(scratch []byte, val uint64) []byte {
+	for true {
+		switch {
+		case val < 0xf0:
+			return append(scratch, uint8(val))
+
+		case val <= 0xffff:
+			size := len(scratch)
+			if cap(scratch) > size+2 {
+				scratch = scratch[:(size + 3)]
+				scratch[size] = 0xf1
+				*(*uint16)(unsafe.Pointer((&scratch[size+1]))) = uint16(val)
+				return scratch
+			}
+		case val <= 0xffffffff:
+			size := len(scratch)
+			if cap(scratch) > size+4 {
+				scratch = scratch[:(size + 5)]
+				scratch[size] = 0xf2
+				*(*uint32)(unsafe.Pointer((&scratch[size+1]))) = uint32(val)
+				return scratch
+			}
+		default:
+			size := len(scratch)
+			if cap(scratch) > size+8 {
+				scratch = scratch[:(size + 9)]
+				scratch[size] = 0xf3
+				*(*uint64)(unsafe.Pointer((&scratch[size+1]))) = uint64(val)
+				return scratch
+			}
+		}
+
+		// increase the slice cap to make room for encoded data
+		c := cap(scratch)
+		if c == 0 {
+			c = 1
+		}
+		tmp := make([]byte, len(scratch), 2*c)
+		copy(tmp, scratch)
+		scratch = tmp
+	}
+
+	panic("Should not reach here")
+	return nil
+}
+
+// decode a integer value and return the slice after the bytes
+// have been consumed by the decode process
+func DecodeVarInt(data []byte) (val uint64, result []byte) {
+	size := len(data)
+	if size < 1 {
+		result = data
+		return
+	}
+
+	flag := data[0]
+	switch {
+	case flag < 0xf0:
+		val = uint64(flag)
+		result = data[1:]
+	case flag == 0xf1:
+		val = uint64(*(*uint16)(unsafe.Pointer(&data[1])))
+		result = data[3:]
+	case flag == 0xf2:
+		val = uint64(*(*uint32)(unsafe.Pointer(&data[1])))
+		result = data[5:]
+	case flag == 0xf3:
+		val = uint64(*(*uint64)(unsafe.Pointer(&data[1])))
+		result = data[9:]
+	default:
+		panic("Bad flag value")
+	}
+
+	return
+}
+
 // encode a slice @data into @scratch, and return the resulting slice
 func EncodeSlice(scratch []byte, data []byte) []byte {
 	dsize := len(data)

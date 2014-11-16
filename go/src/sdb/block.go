@@ -56,10 +56,12 @@ func parseSimpleEntry(data []byte, off uint32) (key, val []byte, s uint32) {
 
 	// parse key length
 	{
-		v, l, ok := ParseVarInt(data, pos)
-		switch ok.(type) {
-		case VarIntOk:
-		default:
+		left := data[pos:]
+		v, r := DecodeVarInt(left)
+
+		// abort if we fails to decode
+		l := len(left) - len(r)
+		if l <= 0 {
 			return
 		}
 
@@ -70,10 +72,12 @@ func parseSimpleEntry(data []byte, off uint32) (key, val []byte, s uint32) {
 
 	// parse value length
 	{
-		v, l, ok := ParseVarInt(data, pos)
-		switch ok.(type) {
-		case VarIntOk:
-		default:
+		left := data[pos:]
+		v, r := DecodeVarInt(left)
+
+		// abort if we fails to decode
+		l := len(left) - len(r)
+		if l <= 0 {
 			return
 		}
 
@@ -181,24 +185,26 @@ func (a *BlockBuilder) Add(key []byte, val []byte) bool {
 
 	// append key length
 	{
-		s, ok := AppendVarInt(a.data, int(a.cur), uint64(keylen))
-		switch ok.(type) {
-		case VarIntOk:
-		default:
+		b := a.data[a.cur:a.cur]
+		r := EncodeVarInt(b, uint64(keylen))
+
+		if len(r) == 0 {
 			return false
 		}
-		a.cur = a.cur + uint32(s)
+
+		a.cur = a.cur + uint32(len(r))
 	}
 
 	// append value length
 	{
-		s, ok := AppendVarInt(a.data, int(a.cur), uint64(vallen))
-		switch ok.(type) {
-		case VarIntOk:
-		default:
+		b := a.data[a.cur:a.cur]
+		r := EncodeVarInt(b, uint64(vallen))
+
+		if len(r) == 0 {
 			return false
 		}
-		a.cur = a.cur + uint32(s)
+
+		a.cur = a.cur + uint32(len(r))
 	}
 
 	// append key
